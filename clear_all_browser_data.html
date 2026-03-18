@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Effacement Complet des Données YTECH</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            background: white;
+            padding: 40px;
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            text-align: center;
+            max-width: 500px;
+            width: 100%;
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+            font-size: 28px;
+        }
+        .status {
+            margin: 20px 0;
+            padding: 15px;
+            border-radius: 8px;
+            font-weight: bold;
+        }
+        .success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .warning {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            margin: 10px;
+            transition: transform 0.2s;
+        }
+        .btn:hover {
+            transform: translateY(-2px);
+        }
+        .progress {
+            width: 100%;
+            height: 20px;
+            background: #f0f0f0;
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 20px 0;
+        }
+        .progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            width: 0%;
+            transition: width 0.5s ease;
+        }
+        .data-list {
+            text-align: left;
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        .data-list ul {
+            list-style: none;
+            padding: 0;
+        }
+        .data-list li {
+            padding: 8px 0;
+            border-bottom: 1px solid #dee2e6;
+        }
+        .data-list li:last-child {
+            border-bottom: none;
+        }
+        .check {
+            color: #28a745;
+            margin-right: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧹 Nettoyage Complet YTECH</h1>
+        
+        <div class="data-list">
+            <h3>Données qui seront effacées :</h3>
+            <ul>
+                <li><span class="check">✓</span> LocalStorage (tokens, données utilisateur)</li>
+                <li><span class="check">✓</span> SessionStorage (données de session)</li>
+                <li><span class="check">✓</span> Cookies (sessions, préférences)</li>
+                <li><span class="check">✓</span> Cache du navigateur</li>
+                <li><span class="check">✓</span> IndexedDB (données offline)</li>
+            </ul>
+        </div>
+
+        <div class="progress">
+            <div class="progress-bar" id="progressBar"></div>
+        </div>
+
+        <div id="status" class="status warning">
+            ⚠️ Prêt à effacer toutes les données du navigateur
+        </div>
+
+        <button class="btn" onclick="clearAllData()">🗑️ Effacer Toutes les Données</button>
+        <button class="btn" onclick="redirectToApp()">🚀 Aller à YTECH</button>
+
+        <script>
+            function updateProgress(percent, message) {
+                document.getElementById('progressBar').style.width = percent + '%';
+                document.getElementById('status').innerHTML = message;
+                document.getElementById('status').className = 'status ' + (percent === 100 ? 'success' : 'warning');
+            }
+
+            function clearAllData() {
+                updateProgress(10, '🔄 Début du nettoyage...');
+                
+                setTimeout(() => {
+                    // Effacer localStorage
+                    localStorage.clear();
+                    updateProgress(30, '✅ LocalStorage effacé!');
+                    
+                    setTimeout(() => {
+                        // Effacer sessionStorage
+                        sessionStorage.clear();
+                        updateProgress(50, '✅ SessionStorage effacé!');
+                        
+                        setTimeout(() => {
+                            // Effacer tous les cookies
+                            document.cookie.split(";").forEach(function(c) { 
+                                document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/;domain=." + location.hostname.split('.').slice(-2).join("."));
+                                document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/");
+                            });
+                            updateProgress(70, '✅ Cookies effacés!');
+                            
+                            setTimeout(() => {
+                                // Effacer IndexedDB
+                                if ('indexedDB' in window) {
+                                    indexedDB.databases().then(databases => {
+                                        databases.forEach(db => {
+                                            indexedDB.deleteDatabase(db.name);
+                                        });
+                                    });
+                                }
+                                updateProgress(90, '✅ IndexedDB effacé!');
+                                
+                                setTimeout(() => {
+                                    updateProgress(100, '🎉 Toutes les données ont été effacées avec succès!');
+                                    
+                                    setTimeout(() => {
+                                        redirectToApp();
+                                    }, 2000);
+                                }, 500);
+                            }, 500);
+                        }, 500);
+                    }, 500);
+                }, 500);
+            }
+
+            function redirectToApp() {
+                window.location.href = 'http://localhost:3000';
+            }
+
+            // Auto-redirect après 10 secondes si aucune action
+            setTimeout(() => {
+                if (document.getElementById('progressBar').style.width === '0%') {
+                    updateProgress(100, '⏰ Redirection automatique...');
+                    setTimeout(redirectToApp, 1500);
+                }
+            }, 10000);
+        </script>
+    </div>
+</body>
+</html>
