@@ -1,16 +1,18 @@
 {
+  "name": "ynov-project",
+  "version": "1.0.0",
+  "private": true,
+
   "scripts": {
+    "start": "react-scripts start",
+    "build": "react-scripts build",
+
     "reset:data": "npm --prefix backend run reset:data",
     "reset:data:all": "npm --prefix backend run reset:data:all",
     "reset:data:dry-run": "npm --prefix backend run reset:data:dry-run"
   },
+
   "dependencies": {
     "pg": "^8.20.0"
   }
-{
-  "scripts": {
-    "start": "react-scripts start",
-    "build": "react-scripts build"
-  }
-}  
 }
