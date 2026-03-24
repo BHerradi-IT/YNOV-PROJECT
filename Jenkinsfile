@@ -4,8 +4,6 @@ pipeline {
     environment {
         IMAGE_NAME = "ynov-project-image"
         CONTAINER_NAME = "ynov-project-container"
-        HOST_PORT = "8082"
-        CONTAINER_PORT = "80"
     }
 
     stages {
@@ -26,11 +24,8 @@ pipeline {
         stage('Stop Old Container') {
             steps {
                 script {
-                    sh """
-                    if [ \$(docker ps -a -q -f name=${CONTAINER_NAME}) ]; then
-                        docker rm -f ${CONTAINER_NAME}
-                    fi
-                    """
+                    sh "docker stop ${CONTAINER_NAME} || true"
+                    sh "docker rm ${CONTAINER_NAME} || true"
                 }
             }
         }
@@ -38,7 +33,7 @@ pipeline {
         stage('Run Container') {
             steps {
                 script {
-                    sh "docker run -d --name ${CONTAINER_NAME} -p ${HOST_PORT}:${CONTAINER_PORT} ${IMAGE_NAME}"
+                    sh "docker run -d --name ${CONTAINER_NAME} -p 8082:80 ${IMAGE_NAME}"
                 }
             }
         }

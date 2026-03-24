@@ -1,21 +1,14 @@
-# Base image
+# Use official Nginx Alpine image
 FROM nginx:alpine
 
-# Set working directory
-WORKDIR /usr/share/nginx/html
-
-# Copy frontend files
-COPY frontend/ ./frontend/
-COPY index.html .
-
-# Copy backend application
-COPY backend/ /usr/share/nginx/backend/
+# Copy React build (public folder) to Nginx html folder
+COPY frontend/public/ /usr/share/nginx/html/
 
 # Copy custom Nginx config
 COPY nginx/default.conf /etc/nginx/conf.d/default.conf
 
-# Expose port 80 (mapped to host 8082)
+# Expose port 80 (mapped to host by Jenkins)
 EXPOSE 80
 
-# Start Nginx (already entrypoint in nginx:alpine)
+# Start Nginx
 CMD ["nginx", "-g", "daemon off;"]
