@@ -42,7 +42,7 @@ pipeline {
             steps {
                 echo "Running new container..."
                 script {
-                    sh "docker run -d --name ${CONTAINER_NAME} -p 8082:8082 ${IMAGE_NAME}"
+                    sh "docker run -d --name ${CONTAINER_NAME} -p 8082:80 ${IMAGE_NAME}"
                 }
             }
         }
