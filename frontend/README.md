@@ -1,348 +1,297 @@
-# 🚀 YTECH Web Application
+# YTECH Enterprise - Frontend
 
-<p align="center">
-  <img src="docs/banner.svg" alt="YTECH Web Application banner" width="100%" />
-</p>
+Application web moderne et sécurisée pour YTECH, entreprise spécialisée dans le développement web professionnel au Maroc.
 
-<p align="center">
-  <img alt="Frontend React" src="https://img.shields.io/badge/Frontend-React%2018-61DAFB?style=for-the-badge&logo=react&logoColor=061A23" />
-  <img alt="Backend Node.js" src="https://img.shields.io/badge/Backend-Node.js-3C873A?style=for-the-badge&logo=node.js&logoColor=white" />
-  <img alt="Database PostgreSQL" src="https://img.shields.io/badge/Database-PostgreSQL-336791?style=for-the-badge&logo=postgresql&logoColor=white" />
-  <img alt="Mode" src="https://img.shields.io/badge/UI-Light%20%2F%20Dark-F59E0B?style=for-the-badge" />
-</p>
+## 🚀 Fonctionnalités
 
-<p align="center">
-  Site vitrine, espace client, espace admin, devis, paiement, messagerie et suivi projet dans une seule application.
-</p>
+### 🎯 Core Features
+- **Authentification sécurisée** avec rôles (Admin/Client)
+- **Système de messagerie** en temps réel
+- **Formulaire de contact** intelligent avec notifications admin
+- **Gestion des devis** et demandes de projets
+- **Interface responsive** et accessible
+- **Performance optimisée** avec lazy loading
 
-Les visuels utilises dans ce README sont versionnes dans `docs/`.
+### 🛡️ Sécurité
+- Validation des entrées côté client
+- Protection contre les attaques XSS
+- Gestion sécurisée des sessions
+- Logging des erreurs et activités
 
----
+### 🎨 Design System
+- Composants réutilisables et stylisés
+- Support du mode sombre
+- Animations fluides et micro-interactions
+- Interface accessible (WCAG)
 
-## ✨ Overview
+## 📁 Structure du Projet
 
-YTECH Web Application est une plateforme full stack qui permet de :
-
-- 🌐 presenter les services, le portfolio et l identite YTECH
-- 🧾 recevoir des demandes de devis avec estimation logique
-- 👤 gerer les comptes client et admin
-- 📊 suivre les projets depuis un dashboard
-- 💳 payer un devis valide
-- 💬 centraliser les conversations client / admin
-- 🗄️ persister les donnees metier dans PostgreSQL
-
-## 🖼️ Parcours Principal
-
-<p align="center">
-  <img src="docs/workflow.svg" alt="Workflow devis paiement projet" width="100%" />
-</p>
-
-Le flow principal est le suivant :
-
-1. le client envoie un devis
-2. l admin analyse la demande
-3. l admin accepte ou refuse
-4. si le devis est accepte, le paiement devient disponible
-5. le paiement valide fait passer le projet en cours
-
-## 🎯 Fonctionnalites
-
-### 🌍 Site public
-- accueil redesign
-- services
-- portfolio
-- a propos
-- contact avec 2 intents :
-  - besoin d aide
-  - aide devis
-- devis avec estimation selon service + options + delai
-- chatbot integre
-- mode clair / sombre
-
-### 👨‍💼 Espace client
-- inscription et connexion
-- dashboard client
-- suivi d avancement du projet
-- consultation des devis
-- paiement d un devis accepte
-- messagerie avec l equipe
-
-### 🛡️ Espace admin
-- dashboard admin centre sur les devis
-- suivi des nouveaux devis
-- suivi des paiements en attente
-- acceptation / refus avec note admin
-- fixation du montant a payer
-- messagerie admin
-- lecture des demandes de contact, devis et messages
-
-## 🧱 Stack Technique
-
-| Layer | Tech |
-|---|---|
-| Frontend | React 18, React Router DOM 6, CSS |
-| Backend | Node.js, Express |
-| Database | PostgreSQL |
-| Security | Helmet, CORS, JWT, rate limiting, bcryptjs |
-| Runtime | npm, PM2 ou Node |
-| Deploy | web-server + db-server |
-
-## 🏗️ Deploiement Recommande
-
-<p align="center">
-  <img src="docs/deployment.svg" alt="Architecture web-server db-server" width="100%" />
-</p>
-
-Architecture conseillee :
-
-- `web-server` : Nginx + Node.js + backend + build frontend
-- `db-server` : PostgreSQL uniquement
-
-Principe :
-
-- le frontend build est servi par le backend ou via Nginx
-- le backend tourne sur le `web-server`
-- PostgreSQL tourne sur le `db-server`
-- le `web-server` se connecte a PostgreSQL via IP privee
-- le port `5432` ne doit pas etre public
-
-## 📁 Structure
-
-```text
-YTech-Web-Application/
-|-- frontend/
-|   |-- public/
-|   `-- src/
-|       |-- components/
-|       |-- pages/
-|       |-- styles/
-|       |-- utils/
-|       `-- App.jsx
-|-- backend/
-|   |-- config/
-|   |-- middleware/
-|   |-- models/
-|   |-- routes/
-|   |-- utils/
-|   `-- server.js
-|-- docs/
-|   |-- banner.svg
-|   |-- workflow.svg
-|   `-- deployment.svg
-`-- README.md
+```
+src/
+├── components/          # Composants réutilisables
+│   ├── Button.jsx       # Bouton stylisé
+│   ├── Card.jsx         # Carte moderne
+│   ├── Input.jsx        # Champ de saisie
+│   ├── Loading.jsx      # Indicateur de chargement
+│   ├── Toast.jsx        # Notifications toast
+│   ├── ErrorBoundary.jsx # Gestion des erreurs
+│   └── ProtectedRoute.jsx # Routes protégées
+├── hooks/               # Hooks personnalisés
+│   ├── useAuth.js       # Gestion authentification
+│   ├── useLocalStorage.js # Stockage local
+│   └── useToast.js      # Notifications
+├── pages/               # Pages de l'application
+├── services/            # Services externes
+│   ├── logger.js        # Logging système
+│   └── realtime.js      # Communication temps réel
+├── utils/               # Utilitaires
+│   ├── constants.js     # Constantes de l'application
+│   └── helpers.js       # Fonctions utilitaires
+└── styles/              # Styles CSS
+    └── commercial.css   # Styles principaux
 ```
 
-## 🔗 Routes Principales
+## 🛠️ Technologies Utilisées
 
 ### Frontend
-- `/`
-- `/services`
-- `/portfolio`
-- `/about`
-- `/contact`
-- `/devis`
-- `/login`
-- `/register`
-- `/payment`
-- `/payment-success`
-- `/dashboard`
-- `/messages`
-- `/devis-management`
-- `/admin-messages`
+- **React 18.2.0** - Framework JavaScript
+- **React Router 6.8.0** - Routage client
+- **CSS3** - Stylisation avec variables CSS
+- **JavaScript ES6+** - Langage moderne
 
-### API backend
-- `/api/health`
-- `/api/auth`
-- `/api/user`
-- `/api/contact`
-- `/api/quotes`
-- `/api/messages`
+### Outils de Développement
+- **ESLint** - Linting du code
+- **Prettier** - Formatage du code
+- **Testing Library** - Tests unitaires
 
-## 🗄️ Base de Donnees
+## 📦 Installation
 
-PostgreSQL est utilise pour :
+### Prérequis
+- Node.js 16+ 
+- npm 8+
 
-- les utilisateurs
-- les sessions
-- les demandes de contact
-- les devis
-- les messages
+### Étapes d'installation
 
-Le bootstrap backend cree automatiquement les tables si elles n existent pas encore.
-
-Le compte admin est synchronise au demarrage via les variables d environnement.
-
-## ⚡ Quick Start
-
-### 1. Cloner le projet
-
+1. **Cloner le repository**
 ```bash
-git clone https://github.com/ytech-solutions-projet/YTech-Web-Application.git
-cd YTech-Web-Application
+git clone <repository-url>
+cd ytech-enterprise/frontend
 ```
 
-### 2. Installer les dependances
-
+2. **Installer les dépendances**
 ```bash
-cd frontend
-npm install
-
-cd ../backend
 npm install
 ```
 
-### 3. Configurer `backend/.env`
+3. **Configurer l'environnement**
+```bash
+cp .env.example .env
+# Éditer .env avec vos configurations
+```
+
+4. **Démarrer l'application**
+```bash
+npm start
+```
+
+5. **Accéder à l'application**
+Ouvrir [http://localhost:3000](http://localhost:3000)
+
+## ⚙️ Configuration
+
+### Variables d'environnement
+
+Copiez `.env.example` vers `.env` et configurez:
 
 ```env
-NODE_ENV=development
-PORT=5001
+# URL de l'API backend
+REACT_APP_API_URL=http://localhost:5001
 
-FRONTEND_URL=http://localhost:3000
-ALLOWED_ORIGINS=http://localhost:3000
-TRUST_PROXY=false
+# Configuration de l'application
+REACT_APP_NAME=YTECH
+REACT_APP_VERSION=3.0.0
 
-JWT_SECRET=change-this-with-a-strong-secret-at-least-32-characters
-SESSION_SECRET=change-this-with-a-strong-secret-at-least-32-characters
+# Configuration de sécurité
+REACT_APP_ENCRYPTION_ENABLED=true
+REACT_APP_SESSION_TIMEOUT=3600000
 
-AUTH_COOKIE_NAME=ytech_auth
-AUTH_COOKIE_SECURE=false
-AUTH_COOKIE_SAME_SITE=strict
-SESSION_TIMEOUT_HOURS=24
-PASSWORD_RESET_BASE_URL=http://localhost:3000
-PASSWORD_RESET_TOKEN_TTL_MINUTES=15
-
-RATE_LIMIT_WINDOW_MS=900000
-RATE_LIMIT_MAX_REQUESTS=100
-AUTH_RATE_LIMIT_MAX=5
-REGISTER_RATE_LIMIT_MAX=5
-PASSWORD_RESET_RATE_LIMIT_MAX=5
-CONTACT_RATE_LIMIT_MAX=10
-QUOTE_RATE_LIMIT_MAX=10
-
-DB_HOST=localhost
-DB_PORT=5432
-DB_NAME=ytech_db
-DB_USER=ytech_user
-DB_PASSWORD=your_postgresql_password
-DB_SSL=false
-DB_SSL_REJECT_UNAUTHORIZED=true
-DB_SSL_CA_FILE=
-REDIS_URL=
-
-EMAIL_HOST=smtp.mailtrap.io
-EMAIL_PORT=2525
-EMAIL_SECURE=false
-EMAIL_REQUIRE_TLS=true
-EMAIL_USER=your-mailtrap-user
-EMAIL_PASS=your-mailtrap-pass
-EMAIL_FROM_NAME=YTECH
-EMAIL_FROM_ADDRESS=no-reply@ytech.ma
-ADMIN_EMAIL=contact@ytech.ma
-
-ADMIN_SEED_NAME=YTECH Admin
-ADMIN_SEED_EMAIL=admin@ytech.ma
-ADMIN_SEED_PASSWORD=change-this-admin-password
-ADMIN_SEED_PHONE=+212600000000
-ADMIN_SEED_COMPANY=YTECH
+# Configuration du logging
+REACT_APP_LOG_LEVEL=info
+REACT_APP_LOG_TO_SERVER=true
 ```
 
-### 4. Lancer le projet
+## 🧪 Tests
 
-Backend :
-
+### Exécuter les tests
 ```bash
-cd backend
-npm start
+# Tests unitaires
+npm test
+
+# Tests avec couverture
+npm run test:coverage
+
+# Tests en mode watch
+npm test -- --watch
 ```
 
-Frontend :
-
+### Linting
 ```bash
-cd frontend
-npm start
+# Vérifier le code
+npm run lint
+
+# Corriger automatiquement
+npm run lint:fix
 ```
 
-### 5. Acces local
+## 📊 Performance
 
-- Frontend : `http://localhost:3000`
-- Backend : `http://localhost:5001`
-- Health check : `http://localhost:5001/api/health`
+### Optimisations implémentées
+- **Lazy loading** des composants
+- **Code splitting** automatique
+- **Memoization** des hooks
+- **Optimisation CSS** avec variables
+- **Compression** des assets
 
-## 🏭 Build Production
+### Monitoring
+- **Web Vitals** pour les métriques
+- **Error tracking** avec logging
+- **Performance monitoring** intégré
 
-Frontend :
+## 🔄 Déploiement
 
+### Build de production
 ```bash
-cd frontend
 npm run build
 ```
 
-Backend :
+### Déploiement statique
+Le build génère des fichiers statiques dans `build/` qui peuvent être déployés sur:
+- Netlify
+- Vercel
+- GitHub Pages
+- AWS S3 + CloudFront
 
+### Variables de production
 ```bash
-cd backend
-npm start
+REACT_APP_ENV=production
+REACT_APP_API_URL=https://api.ytech.ma
+REACT_APP_LOG_LEVEL=error
 ```
 
-En production, le backend peut servir le build React directement.
+## 🎯 Guide de Développement
 
-## 🔐 Securite Deja En Place
+### Architecture des Composants
 
-Le projet inclut deja :
+#### 1. Structure d'un composant
+```jsx
+import React from 'react';
+import './ComponentName.css';
 
-- validation et normalisation des donnees
-- mots de passe forts
-- hash des mots de passe avec `bcryptjs`
-- JWT en cookie HTTP-only
-- verification serveur de session
-- `helmet`
-- politique CORS
-- rate limiting
-- protection de routes par role
-- seed admin via variables d environnement
-- stockage metier cote serveur / PostgreSQL
+const ComponentName = ({ prop1, prop2, ...props }) => {
+  // Logique du composant
+  
+  return (
+    <div className="component-name" {...props}>
+      {/* JSX du composant */}
+    </div>
+  );
+};
 
-## 🧪 Commandes Utiles
-
-Frontend :
-
-```bash
-npm start
-npm run build
+export default ComponentName;
 ```
 
-Backend :
+#### 2. Hooks personnalisés
+```jsx
+import { useState, useEffect } from 'react';
 
-```bash
-npm start
-npm run dev
+const useCustomHook = (initialValue) => {
+  const [state, setState] = useState(initialValue);
+  
+  // Logique du hook
+  
+  return [state, setState];
+};
+
+export default useCustomHook;
 ```
 
-## 📌 Notes Importantes
+#### 3. Services
+```jsx
+class ServiceClass {
+  constructor() {
+    this.logger = logger.createModuleLogger('ServiceName');
+  }
+  
+  method() {
+    this.logger.info('Method called');
+    // Logique du service
+  }
+}
 
-- ne mets pas le mot de passe admin en dur dans un README public
-- les identifiants admin se definissent via `backend/.env`
-- le backend doit etre redemarre apres modification du `.env`
-- en dev, le frontend proxyfie vers `http://localhost:5001`
+export default new ServiceClass();
+```
 
-## ✅ Etat Actuel
+### Bonnes Pratiques
 
-Le projet inclut deja :
+#### ✅ À faire
+- Utiliser les hooks personnalisés pour la logique partagée
+- Suivre les conventions de nommage
+- Ajouter des tests pour les composants critiques
+- Utiliser le système de design (Button, Card, Input)
+- Logger les erreurs et activités importantes
 
-- redesign global des pages
-- dark mode / light mode
-- chatbot
-- gestion admin / client
-- PostgreSQL pour les donnees principales
-- flow devis -> validation admin -> paiement -> projet en cours
-- compatibilite avec architecture `web-server` + `db-server`
+#### ❌ À éviter
+- Code dupliqué
+- Composants trop volumineux (>300 lignes)
+- Ignorer les warnings ESLint
+- Oublier la gestion des erreurs
+- Hardcoder les valeurs
 
-## 🔗 Repository
+## 🐛 Débogage
 
-GitHub :
+### Outils de débogage
+- **React DevTools** pour inspecter les composants
+- **Console logging** avec le logger intégré
+- **Error Boundary** pour capturer les erreurs
+- **Network tab** pour vérifier les appels API
 
-`https://github.com/ytech-solutions-projet/YTech-Web-Application.git`
+### Logging
+```jsx
+import logger from '../services/logger';
+
+// Dans un composant
+logger.info('Component mounted');
+logger.error('Error occurred', error);
+logger.debug('Debug information', data);
+```
+
+## 🤝 Contribuer
+
+### Workflow de contribution
+1. Forker le repository
+2. Créer une branche feature
+3. Implémenter les changements
+4. Ajouter des tests
+5. Vérifier le linting
+6. Soumettre une Pull Request
+
+### Standards de code
+- **ESLint** configuré avec React rules
+- **Prettier** pour le formatage
+- **Conventional Commits** pour les messages
+- **Tests** pour les nouvelles fonctionnalités
+
+## 📝 License
+
+Ce projet est sous license MIT. Voir [LICENSE](../LICENSE) pour plus de détails.
+
+## 📞 Support
+
+Pour toute question ou support technique:
+- **Email**: contact@ytech.ma
+- **Site**: [ytech.ma](https://ytech.ma)
+- **Documentation**: [docs.ytech.ma](https://docs.ytech.ma)
 
 ---
 
-> 💡 Astuce : si tu veux un README encore plus impressionnant, tu peux remplacer les SVG dans `docs/` par de vraies captures d ecran de l accueil, du dashboard et du paiement.
+**YTECH** - Votre expert en développement web professionnel au Maroc 🇲🇦
