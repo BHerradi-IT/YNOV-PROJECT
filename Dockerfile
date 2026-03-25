@@ -1,14 +1,18 @@
-# Use official Nginx Alpine image
+# Stage 1: Build React
+FROM node:18-alpine AS builder
+WORKDIR /app
+
+COPY frontend/package*.json ./
+RUN npm install
+
+COPY frontend/ ./
+RUN npm run build
+
+# Stage 2: Nginx
 FROM nginx:alpine
 
-# Copy React build (public folder) to Nginx html folder
-COPY frontend/public/ /usr/share/nginx/html/
-
-# Copy custom Nginx config
+COPY --from=builder /app/build /usr/share/nginx/html
 COPY nginx/default.conf /etc/nginx/conf.d/default.conf
 
-# Expose port 80 (mapped to host by Jenkins)
 EXPOSE 80
-
-# Start Nginx
 CMD ["nginx", "-g", "daemon off;"]
