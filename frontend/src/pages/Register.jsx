@@ -256,10 +256,6 @@ const Register = () => {
         `/verify-email?email=${encodeURIComponent(payload.email || email)}&next=${encodeURIComponent(nextPath)}`,
         {
           state: {
-            justRegistered: true,
-            registrationMessage: payload.message || '',
-            verificationExpiresInHours: payload.verificationExpiresInHours || null,
-            emailDelivery: payload.emailDelivery || null,
             devVerificationToken: payload.verificationToken || '',
             devVerificationUrl: payload.verificationUrl || ''
           }
