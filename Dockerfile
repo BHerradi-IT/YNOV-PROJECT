@@ -3,7 +3,7 @@ FROM node:18-alpine AS builder
 WORKDIR /app
 
 COPY frontend/package*.json ./
-RUN npm install
+RUN npm run build || (echo "BUILD FAILED" && ls -la && cat package.json)
 
 COPY frontend/ ./
 RUN npm run build
