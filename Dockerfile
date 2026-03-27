@@ -2,8 +2,10 @@
 FROM node:18-alpine AS builder
 WORKDIR /app
 
+ENV NODE_ENV=development
+
 COPY frontend/package*.json ./
-RUN npm run build || (echo "BUILD FAILED" && ls -la && cat package.json)
+RUN npm install
 
 COPY frontend/ ./
 RUN npm run build
