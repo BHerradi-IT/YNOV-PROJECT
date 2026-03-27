@@ -2,6 +2,7 @@
   "name": "ynov-project",
   "version": "1.0.0",
   "private": true,
+
   "scripts": {
     "start": "react-scripts start",
     "build": "react-scripts build",
@@ -9,10 +10,12 @@
     "reset:data:all": "npm --prefix backend run reset:data:all",
     "reset:data:dry-run": "npm --prefix backend run reset:data:dry-run"
   },
-"dependencies": {
-  "react": "^18.2.0",
-  "react-dom": "^18.2.0",
-  "react-scripts": "5.0.1",
-  "react-router-dom": "^6.22.3",
-  "pg": "^8.20.0"
+
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-scripts": "5.0.1",
+    "react-router-dom": "^6.22.3",
+    "pg": "^8.20.0"
+  }
 }
