@@ -8,7 +8,7 @@ COPY frontend/package*.json ./
 RUN npm install
 
 COPY frontend/ ./
-RUN npm run build
+RUN npm run build || (echo "BUILD FAILED" && ls -la && ls -la src && ls -la public)
 
 # Stage 2: Nginx
 FROM nginx:alpine
