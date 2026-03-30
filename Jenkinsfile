@@ -25,7 +25,6 @@ pipeline {
                         echo "Checking frontend/src directory..."
                         ls -la frontend/src/ || echo "frontend/src not found!"
                         
-                        # استخدام Docker لتشغيل sonar-scanner
                         docker run --rm \
                           -v $(pwd):/usr/src \
                           -w /usr/src \
@@ -57,7 +56,7 @@ pipeline {
                         echo "Quality Gate Status: ${STATUS}"
                         
                         if [ "$STATUS" = "ERROR" ]; then
-                            echo "❌ Quality Gate failed! Please check SonarQube for details."
+                            echo "❌ Quality Gate failed!"
                             exit 1
                         elif [ "$STATUS" = "OK" ]; then
                             echo "✅ Quality Gate passed!"
@@ -78,46 +77,27 @@ pipeline {
             }
         }
 
-        // ========== 4. Trivy Security Scan (باستخدام Docker) ==========
-        stage('Trivy Security Scan') {
+        // ========== 4. Trivy Security Scan (باستخدام Grype كبديل مؤقت) ==========
+        stage('Security Scan') {
             steps {
                 script {
                     sh '''
-                        echo "========== Trivy Security Scan Started =========="
-                        echo "Scanning Docker image: ${IMAGE_NAME}:latest"
+                        echo "========== Security Scan Started =========="
+                        echo "Using Grype as an alternative to Trivy"
                         
-                        # استخدام حاوية Trivy مباشرة (بدون تثبيت)
+                        # سحب صورة Grype (بديل جيد لـ Trivy)
+                        docker pull anchore/grype:latest
+                        
+                        # فحص الصورة
                         docker run --rm \
                           -v /var/run/docker.sock:/var/run/docker.sock \
-                          -v $(pwd):/src \
-                          -w /src \
-                          aquasec/trivy:latest \
-                          image \
-                          --severity HIGH,CRITICAL \
-                          --exit-code 1 \
-                          --format table \
-                          ${IMAGE_NAME}:latest
+                          anchore/grype:latest \
+                          ${IMAGE_NAME}:latest \
+                          --fail-on high \
+                          --scope AllLayers
                         
-                        # إنشاء تقرير JSON
-                        docker run --rm \
-                          -v /var/run/docker.sock:/var/run/docker.sock \
-                          -v $(pwd):/src \
-                          -w /src \
-                          aquasec/trivy:latest \
-                          image \
-                          --severity HIGH,CRITICAL \
-                          --format json \
-                          --output ${TRIVY_REPORT} \
-                          ${IMAGE_NAME}:latest
-                        
-                        echo "✅ Trivy scan completed - No HIGH/CRITICAL vulnerabilities found"
+                        echo "✅ Security scan completed"
                     '''
-                }
-            }
-            post {
-                always {
-                    // حفظ التقرير كـ artifact
-                    archiveArtifacts artifacts: 'trivy-report.json', fingerprint: true, allowEmptyArchive: true
                 }
             }
         }
@@ -137,7 +117,7 @@ pipeline {
             steps {
                 script {
                     sh "docker run -d --name ${CONTAINER_NAME} -p 80:80 ${IMAGE_NAME}:latest"
-                    echo "✅ Container started successfully on port 80"
+                    echo "✅ Container started on port 80"
                 }
             }
         }
@@ -147,18 +127,11 @@ pipeline {
         success {
             echo "========================================="
             echo "✅ Pipeline completed successfully!"
-            echo "✅ SonarQube Quality Gate: PASSED"
-            echo "✅ Trivy Security Scan: PASSED"
-            echo "✅ Application is running on port 80"
             echo "========================================="
         }
         failure {
             echo "========================================="
             echo "❌ Pipeline failed!"
-            echo "❌ Check one of these:"
-            echo "   - SonarQube Quality Gate (check http://${SONAR_HOST_URL})"
-            echo "   - Trivy found HIGH/CRITICAL vulnerabilities"
-            echo "   - Docker build or runtime error"
             echo "========================================="
         }
     }
