@@ -6,7 +6,7 @@ pipeline {
         CONTAINER_NAME = "ynov-project-container"
         
         // إعدادات SonarQube
-        SONAR_HOST_URL = "http://YOUR_SERVER_IP:9000"  // غيّر هذا إلى IP السيرفر
+        SONAR_HOST_URL = "http://192.168.142.143:9000"  // غيّر هذا إلى IP السيرفر
         SONAR_AUTH_TOKEN = credentials('sonarqube-token')  // سنضيفه في Jenkins
     }
 
