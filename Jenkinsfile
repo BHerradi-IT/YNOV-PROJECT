@@ -5,7 +5,8 @@ pipeline {
         IMAGE_NAME = "ynov-project-image"
         CONTAINER_NAME = "ynov-project-container"
         SONAR_HOST_URL = "http://192.168.142.143:9000"
-        SONAR_TOKEN = credentials('sonar-token')  // استخدم الاسم الصحيح sonar-token
+        SONAR_TOKEN = credentials('sonar-token')
+        TRIVY_REPORT = "trivy-report.json"
     }
 
     stages {
@@ -15,7 +16,7 @@ pipeline {
             }
         }
 
-        // ========== مرحلة SonarQube باستخدام Docker ==========
+        // ========== 1. SonarQube Analysis ==========
         stage('SonarQube Analysis') {
             steps {
                 script {
@@ -37,19 +38,20 @@ pipeline {
                           -Dsonar.exclusions=**/node_modules/**,**/*.test.js \
                           -Dsonar.host.url=${SONAR_HOST_URL} \
                           -Dsonar.login=${SONAR_TOKEN}
+                        
+                        echo "✅ SonarQube analysis completed"
                     '''
                 }
             }
         }
 
-        // ========== مرحلة فحص الجودة ==========
+        // ========== 2. Wait for Quality Gate ==========
         stage('Quality Gate Check') {
             steps {
                 script {
                     echo "Waiting for SonarQube analysis to complete..."
                     sleep(time: 30, unit: 'SECONDS')
                     
-                    // التحقق من نتيجة الجودة
                     sh '''
                         STATUS=$(curl -s -u ${SONAR_TOKEN}: "${SONAR_HOST_URL}/api/qualitygates/project_status?projectKey=ynov-react-app" | grep -o '"status":"[^"]*"' | cut -d'"' -f4)
                         echo "Quality Gate Status: ${STATUS}"
@@ -67,16 +69,59 @@ pipeline {
             }
         }
 
-        // ========== بناء Docker ==========
+        // ========== 3. Build Docker Image ==========
         stage('Build Docker Image') {
             steps {
                 script {
-                    sh "docker build -t ${IMAGE_NAME} ."
+                    sh "docker build -t ${IMAGE_NAME}:latest ."
                 }
             }
         }
 
-        // ========== إيقاف الحاوية القديمة ==========
+        // ========== 4. Trivy Security Scan ==========
+        stage('Trivy Security Scan') {
+            steps {
+                script {
+                    sh '''
+                        echo "========== Trivy Security Scan Started =========="
+                        echo "Scanning Docker image: ${IMAGE_NAME}:latest"
+                        
+                        # التحقق من وجود trivy
+                        if command -v trivy &> /dev/null; then
+                            echo "✅ Trivy found in PATH"
+                            TRIVY_CMD="trivy"
+                        else
+                            echo "⚠️ Trivy not found, using Docker container"
+                            TRIVY_CMD="docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:latest"
+                        fi
+                        
+                        # فحص الثغرات الأمنية في الصورة (فقط HIGH و CRITICAL)
+                        ${TRIVY_CMD} image \
+                          --severity HIGH,CRITICAL \
+                          --exit-code 1 \
+                          --format table \
+                          ${IMAGE_NAME}:latest
+                        
+                        # إنشاء تقرير JSON للتحليل
+                        ${TRIVY_CMD} image \
+                          --severity HIGH,CRITICAL \
+                          --format json \
+                          --output ${TRIVY_REPORT} \
+                          ${IMAGE_NAME}:latest
+                        
+                        echo "✅ Trivy scan completed - No HIGH/CRITICAL vulnerabilities found"
+                    '''
+                }
+            }
+            post {
+                always {
+                    // حفظ التقرير كـ artifact حتى لو فشل الفحص
+                    archiveArtifacts artifacts: 'trivy-report.json', fingerprint: true, allowEmptyArchive: true
+                }
+            }
+        }
+
+        // ========== 5. Stop Old Container ==========
         stage('Stop Old Container') {
             steps {
                 script {
@@ -86,11 +131,12 @@ pipeline {
             }
         }
 
-        // ========== تشغيل الحاوية الجديدة ==========
+        // ========== 6. Run New Container ==========
         stage('Run Container') {
             steps {
                 script {
-                    sh "docker run -d --name ${CONTAINER_NAME} -p 80:80 ${IMAGE_NAME}"
+                    sh "docker run -d --name ${CONTAINER_NAME} -p 80:80 ${IMAGE_NAME}:latest"
+                    echo "✅ Container started successfully on port 80"
                 }
             }
         }
@@ -98,13 +144,21 @@ pipeline {
     
     post {
         success {
+            echo "========================================="
             echo "✅ Pipeline completed successfully!"
-            echo "✅ SonarQube analysis passed!"
+            echo "✅ SonarQube Quality Gate: PASSED"
+            echo "✅ Trivy Security Scan: PASSED"
             echo "✅ Application is running on port 80"
+            echo "========================================="
         }
         failure {
+            echo "========================================="
             echo "❌ Pipeline failed!"
-            echo "❌ Check the logs above for details"
+            echo "❌ Check one of these:"
+            echo "   - SonarQube Quality Gate (check http://${SONAR_HOST_URL})"
+            echo "   - Trivy found HIGH/CRITICAL vulnerabilities"
+            echo "   - Docker build or runtime error"
+            echo "========================================="
         }
     }
 }
