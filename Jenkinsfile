@@ -17,8 +17,8 @@ pipeline {
         // ========== مرحلة SonarQube ==========
         stage('SonarQube Analysis') {
             steps {
-                // استخدام الـ environment مباشرة مع withSonarQubeEnv() بدون اسم محدد
-                withSonarQubeEnv() { 
+                // تأكد من أن الاسم "SonarQube-Server" مطابق تماماً لما في إعدادات Jenkins
+                withSonarQubeEnv(installationName: 'SonarQube-Server') { 
                     sh '''
                         sonar-scanner \
                         -Dsonar.projectKey=ynov-react-app \
