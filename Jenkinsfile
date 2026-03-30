@@ -5,7 +5,7 @@ pipeline {
         IMAGE_NAME = "ynov-project-image"
         CONTAINER_NAME = "ynov-project-container"
         SONAR_HOST_URL = "http://192.168.142.143:9000"
-        SONAR_TOKEN = credentials('sonarqube-token')
+        SONAR_TOKEN = credentials('sonar-token')  // استخدم الاسم الصحيح sonar-token
     }
 
     stages {
@@ -99,10 +99,12 @@ pipeline {
     post {
         success {
             echo "✅ Pipeline completed successfully!"
+            echo "✅ SonarQube analysis passed!"
             echo "✅ Application is running on port 80"
         }
         failure {
             echo "❌ Pipeline failed!"
+            echo "❌ Check the logs above for details"
         }
     }
 }
