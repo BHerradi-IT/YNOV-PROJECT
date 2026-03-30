@@ -192,7 +192,7 @@ pipeline {
             emailext(
                 subject: "❌ Pipeline Failed: ${JOB_NAME} - ${BUILD_NUMBER}",
                 body: "The pipeline has failed. Check Jenkins for details.\n\nBuild URL: ${BUILD_URL}",
-                to: "team@example.com"
+                to: "herradipeace@gmail.com"
             )
         }
     }
