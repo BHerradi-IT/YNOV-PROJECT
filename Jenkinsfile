@@ -78,7 +78,7 @@ pipeline {
             }
         }
 
-        // ========== 4. Trivy Security Scan ==========
+        // ========== 4. Trivy Security Scan (باستخدام Docker) ==========
         stage('Trivy Security Scan') {
             steps {
                 script {
@@ -86,24 +86,25 @@ pipeline {
                         echo "========== Trivy Security Scan Started =========="
                         echo "Scanning Docker image: ${IMAGE_NAME}:latest"
                         
-                        # التحقق من وجود trivy
-                        if command -v trivy &> /dev/null; then
-                            echo "✅ Trivy found in PATH"
-                            TRIVY_CMD="trivy"
-                        else
-                            echo "⚠️ Trivy not found, using Docker container"
-                            TRIVY_CMD="docker run --rm -v /var/run/docker.sock:/var/run/docker.sock aquasec/trivy:latest"
-                        fi
-                        
-                        # فحص الثغرات الأمنية في الصورة (فقط HIGH و CRITICAL)
-                        ${TRIVY_CMD} image \
+                        # استخدام حاوية Trivy مباشرة (بدون تثبيت)
+                        docker run --rm \
+                          -v /var/run/docker.sock:/var/run/docker.sock \
+                          -v $(pwd):/src \
+                          -w /src \
+                          aquasec/trivy:latest \
+                          image \
                           --severity HIGH,CRITICAL \
                           --exit-code 1 \
                           --format table \
                           ${IMAGE_NAME}:latest
                         
-                        # إنشاء تقرير JSON للتحليل
-                        ${TRIVY_CMD} image \
+                        # إنشاء تقرير JSON
+                        docker run --rm \
+                          -v /var/run/docker.sock:/var/run/docker.sock \
+                          -v $(pwd):/src \
+                          -w /src \
+                          aquasec/trivy:latest \
+                          image \
                           --severity HIGH,CRITICAL \
                           --format json \
                           --output ${TRIVY_REPORT} \
@@ -115,7 +116,7 @@ pipeline {
             }
             post {
                 always {
-                    // حفظ التقرير كـ artifact حتى لو فشل الفحص
+                    // حفظ التقرير كـ artifact
                     archiveArtifacts artifacts: 'trivy-report.json', fingerprint: true, allowEmptyArchive: true
                 }
             }
