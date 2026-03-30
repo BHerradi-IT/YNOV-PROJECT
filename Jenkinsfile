@@ -5,9 +5,8 @@ pipeline {
         IMAGE_NAME = "ynov-project-image"
         CONTAINER_NAME = "ynov-project-container"
         
-        // إعدادات SonarQube
-        SONAR_HOST_URL = "http://192.168.142.143:9000"  // غيّر هذا إلى IP السيرفر
-        SONAR_AUTH_TOKEN = credentials('sonarqube-token')  // سنضيفه في Jenkins
+        // إعدادات SonarQube - استخدم IP الصحيح
+        SONAR_HOST_URL = "http://192.168.142.143:9000"
     }
 
     stages {
@@ -17,17 +16,9 @@ pipeline {
             }
         }
 
-        // ========== مرحلة SonarQube الجديدة ==========
         stage('SonarQube Analysis') {
             steps {
                 script {
-                    // التحقق من وجود الملفات قبل التحليل
-                    sh '''
-                        echo "========== SonarQube Analysis Started =========="
-                        echo "Checking frontend/src directory..."
-                        ls -la frontend/src/ || echo "frontend/src not found!"
-                    '''
-                    
                     // تنفيذ تحليل SonarQube
                     withSonarQubeEnv('SonarQube-Server') {
                         sh '''
@@ -37,19 +28,17 @@ pipeline {
                             -Dsonar.projectVersion=1.0 \
                             -Dsonar.sources=frontend/src \
                             -Dsonar.exclusions=**/node_modules/**,**/*.test.js \
-                            -Dsonar.host.url=${SONAR_HOST_URL} \
-                            -Dsonar.login=${SONAR_AUTH_TOKEN}
+                            -Dsonar.host.url=${SONAR_HOST_URL}
                         '''
                     }
                 }
             }
         }
 
-        // ========== مرحلة التحقق من جودة الكود ==========
         stage('Quality Gate Check') {
             steps {
                 script {
-                    // انتظار نتيجة SonarQube (مهلة 5 دقائق)
+                    // انتظر نتيجة SonarQube
                     timeout(time: 5, unit: 'MINUTES') {
                         waitForQualityGate abortPipeline: true
                     }
@@ -83,12 +72,10 @@ pipeline {
         }
     }
     
-    // ========== ما بعد التنفيذ ==========
     post {
         success {
             echo "✅ Pipeline completed successfully!"
             echo "✅ SonarQube analysis passed!"
-            echo "✅ Application is running on port 80"
         }
         failure {
             echo "❌ Pipeline failed!"
