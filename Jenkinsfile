@@ -192,7 +192,36 @@ pipeline {
                 }
             }
         }
-
+        stage('Send Results to Graylog') {
+    steps {
+        script {
+            sh '''
+                echo "========== Sending Trivy Results to Graylog =========="
+                
+                # قراءة تقرير Trivy
+                TRIVY_JSON=$(cat reports/trivy-report.json)
+                
+                # إرسال إلى Graylog عبر GELF HTTP
+                curl -X POST \
+                  -H "Content-Type: application/json" \
+                  -d "{
+                    \"version\": \"1.1\",
+                    \"host\": \"jenkins-server\",
+                    \"short_message\": \"Trivy Security Scan - Build #${BUILD_NUMBER}\",
+                    \"full_message\": \"$(echo $TRIVY_JSON | jq -c .)\",
+                    \"level\": 6,
+                    \"_job_name\": \"${JOB_NAME}\",
+                    \"_build_number\": \"${BUILD_NUMBER}\",
+                    \"_vulnerabilities_high\": $(grep -o '"SEVERITY":"HIGH"' reports/trivy-report.json | wc -l),
+                    \"_vulnerabilities_critical\": $(grep -o '"SEVERITY":"CRITICAL"' reports/trivy-report.json | wc -l)
+                  }" \
+                  http://192.168.10.40:12202/gelf
+                  
+                echo "✅ Results sent to Graylog successfully"
+            '''
+        }
+    }
+}
         // ========== 7. Stop Old Container ==========
         stage('Stop Old Container') {
             steps {
