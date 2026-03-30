@@ -166,32 +166,7 @@ pipeline {
             }
         }
 
-        // ========== 6. Send Report via Email ==========
-        stage('Send Report to Email') {
-            steps {
-                script {
-                    // إرسال البريد الإلكتروني مع التقرير المرفق
-                    emailext(
-                        subject: "🔒 Trivy Security Report - ${JOB_NAME} #${BUILD_NUMBER}",
-                        body: """
-                            Trivy Security Scan Results
-                            
-                            Build: ${JOB_NAME} #${BUILD_NUMBER}
-                            Status: Testing Mode
-                            
-                            Please find attached the security report.
-                            
-                            ---
-                            This is an automated message from Jenkins Pipeline
-                        """,
-                        to: "${EMAIL_RECIPIENT}",
-                        attachmentsPattern: "reports/security-report.html, reports/trivy-summary.txt"
-                    )
-                    
-                    echo "✅ Email sent to ${EMAIL_RECIPIENT}"
-                }
-            }
-        }
+
         stage('Send Results to Graylog') {
     steps {
         script {
