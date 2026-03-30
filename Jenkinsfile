@@ -1,6 +1,11 @@
 pipeline {
     agent any
-
+    
+    // تحديد أداة SonarQube Scanner المثبتة في Jenkins
+    tools {
+        sonar-scanner 'sonar-scanner'
+    }
+    
     environment {
         IMAGE_NAME = "ynov-project-image"
         CONTAINER_NAME = "ynov-project-container"
@@ -17,7 +22,6 @@ pipeline {
         // ========== مرحلة SonarQube ==========
         stage('SonarQube Analysis') {
             steps {
-                // تأكد من أن الاسم "SonarQube-Server" مطابق تماماً لما في إعدادات Jenkins
                 withSonarQubeEnv(installationName: 'SonarQube-Server') { 
                     sh '''
                         sonar-scanner \
@@ -41,7 +45,7 @@ pipeline {
             }
         }
 
-        // ========== مراحل بناء Docker ونشر التطبيق ==========
+        // ========== بناء Docker ==========
         stage('Build Docker Image') {
             steps {
                 script {
@@ -50,6 +54,7 @@ pipeline {
             }
         }
 
+        // ========== إيقاف الحاوية القديمة ==========
         stage('Stop Old Container') {
             steps {
                 script {
@@ -59,6 +64,7 @@ pipeline {
             }
         }
 
+        // ========== تشغيل الحاوية الجديدة ==========
         stage('Run Container') {
             steps {
                 script {
@@ -70,10 +76,13 @@ pipeline {
     
     post {
         success {
-            echo "✅ Pipeline completed successfully! Application is running on port 80."
+            echo "✅ Pipeline completed successfully!"
+            echo "✅ SonarQube analysis passed!"
+            echo "✅ Application is running on port 80"
         }
         failure {
-            echo "❌ Pipeline failed! Please check the SonarQube Quality Gate or Docker build logs."
+            echo "❌ Pipeline failed!"
+            echo "❌ Check SonarQube Quality Gate or Docker build errors"
         }
     }
 }
