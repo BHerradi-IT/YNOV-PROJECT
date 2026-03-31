@@ -2,31 +2,32 @@ pipeline {
     agent any
 
     environment {
-        IMAGE_NAME = "ynov-project"
+        IMAGE_NAME = "ynov-project-image"
         CONTAINER_NAME = "ynov-project-container"
         SONAR_HOST_URL = "http://192.168.142.143:9000"
         SONAR_TOKEN = credentials('sonar-token')
-        EMAIL_RECIPIENT = "herraditech@gmail.com"
+        TRIVY_REPORT = "trivy-report.json"
         
-        // ========== Docker Hub Variables ==========
-        DOCKER_HUB_USERNAME = "peacechouaib"
-        DOCKER_IMAGE_FULL = "${DOCKER_HUB_USERNAME}/${IMAGE_NAME}"
+        // ========== Docker Hub Settings ==========
+        DOCKER_HUB_USERNAME = "herraditech"  // غيّر إلى اسم المستخدم الخاص بك
+        DOCKER_HUB_IMAGE = "ynov-project"
     }
 
     stages {
-        // ========== 1. Clone Repository ==========
         stage('Clone') {
             steps {
                 git branch: 'main', url: 'https://github.com/BHerradi-IT/YNOV-PROJECT.git'
             }
         }
 
-        // ========== 2. SonarQube Analysis ==========
+        // ========== 1. SonarQube Analysis ==========
         stage('SonarQube Analysis') {
             steps {
                 script {
                     sh '''
                         echo "========== SonarQube Analysis Started =========="
+                        echo "Checking frontend/src directory..."
+                        ls -la frontend/src/ || echo "frontend/src not found!"
                         
                         docker run --rm \
                           -v $(pwd):/usr/src \
@@ -47,7 +48,7 @@ pipeline {
             }
         }
 
-        // ========== 3. Quality Gate Check ==========
+        // ========== 2. Wait for Quality Gate ==========
         stage('Quality Gate Check') {
             steps {
                 script {
@@ -59,125 +60,76 @@ pipeline {
                         echo "Quality Gate Status: ${STATUS}"
                         
                         if [ "$STATUS" = "ERROR" ]; then
-                            echo "⚠️ Quality Gate failed - Continuing for testing purposes"
-                        else
+                            echo "❌ Quality Gate failed!"
+                            exit 1
+                        elif [ "$STATUS" = "OK" ]; then
                             echo "✅ Quality Gate passed!"
+                        else
+                            echo "⚠️ Quality Gate status unknown: ${STATUS}"
                         fi
                     '''
                 }
             }
         }
 
-        // ========== 4. Build Docker Image ==========
+        // ========== 3. Build Docker Image ==========
         stage('Build Docker Image') {
             steps {
                 script {
                     sh "docker build -t ${IMAGE_NAME}:latest ."
-                    sh "docker tag ${IMAGE_NAME}:latest ${DOCKER_IMAGE_FULL}:latest"
-                    sh "docker tag ${IMAGE_NAME}:latest ${DOCKER_IMAGE_FULL}:${BUILD_NUMBER}"
-                    echo "✅ Docker image built and tagged successfully"
-                    echo "   Local: ${IMAGE_NAME}:latest"
-                    echo "   Remote: ${DOCKER_IMAGE_FULL}:latest"
-                    echo "   Remote: ${DOCKER_IMAGE_FULL}:${BUILD_NUMBER}"
+                    sh "docker tag ${IMAGE_NAME}:latest ${IMAGE_NAME}:${BUILD_NUMBER}"
                 }
             }
         }
 
-        // ========== 5. Trivy Security Scan ==========
-        stage('Trivy Security Scan') {
+        // ========== 4. Security Scan (Grype) ==========
+        stage('Security Scan') {
             steps {
                 script {
                     sh '''
-                        echo "========== Trivy Security Scan Started =========="
+                        echo "========== Security Scan Started =========="
+                        echo "Using Grype for vulnerability scanning"
                         
-                        mkdir -p reports
-                        
-                        docker run --rm \
-                          -v /var/run/docker.sock:/var/run/docker.sock \
-                          -v $(pwd):/src \
-                          -w /src \
-                          aquasec/trivy:latest \
-                          image ${IMAGE_NAME}:latest \
-                          --format json \
-                          --output reports/trivy-report.json \
-                          --ignore-unfixed || echo "Scan completed"
+                        docker pull anchore/grype:latest
                         
                         docker run --rm \
                           -v /var/run/docker.sock:/var/run/docker.sock \
-                          -v $(pwd):/src \
-                          -w /src \
-                          aquasec/trivy:latest \
-                          image ${IMAGE_NAME}:latest \
-                          --format table \
-                          --output reports/trivy-summary.txt \
-                          --ignore-unfixed || echo "Summary created"
-                        
-                        if [ -f reports/trivy-report.json ]; then
-                            HIGH=$(grep -o '"SEVERITY":"HIGH"' reports/trivy-report.json | wc -l)
-                            CRITICAL=$(grep -o '"SEVERITY":"CRITICAL"' reports/trivy-report.json | wc -l)
-                            echo "🔴 CRITICAL: $CRITICAL"
-                            echo "🟠 HIGH: $HIGH"
-                        fi
+                          anchore/grype:latest \
+                          ${IMAGE_NAME}:latest \
+                          --fail-on high \
+                          --scope AllLayers || echo "⚠️ Vulnerabilities found but continuing"
                         
                         echo "✅ Security scan completed"
                     '''
                 }
             }
-            post {
-                always {
-                    archiveArtifacts artifacts: 'reports/*', allowEmptyArchive: true
-                }
-            }
         }
 
-        // ========== 6. Send to Graylog ==========
-        stage('Send to Graylog') {
-            steps {
-                script {
-                    sh '''
-                        if [ -f reports/trivy-report.json ]; then
-                            HIGH=$(grep -o '"SEVERITY":"HIGH"' reports/trivy-report.json | wc -l)
-                            CRITICAL=$(grep -o '"SEVERITY":"CRITICAL"' reports/trivy-report.json | wc -l)
-                            
-                            curl -X POST -H "Content-Type: application/json" \
-                              -d "{
-                                \"version\": \"1.1\",
-                                \"host\": \"jenkins\",
-                                \"short_message\": \"Trivy Scan #${BUILD_NUMBER}\",
-                                \"_image\": \"peacechouaib/ynov-project\",
-                                \"_high\": $HIGH,
-                                \"_critical\": $CRITICAL
-                              }" \
-                              http://192.168.10.40:12202/gelf || echo "Graylog unavailable"
-                        fi
-                    '''
-                }
-            }
-        }
-
-        // ========== 7. Push to Docker Hub ==========
+        // ========== 5. Push to Docker Hub (NEW STAGE) ==========
         stage('Push to Docker Hub') {
             steps {
                 script {
+                    echo "========== Pushing Image to Docker Hub =========="
+                    
+                    // تسجيل الدخول إلى Docker Hub باستخدام credentials
                     withDockerRegistry(credentialsId: 'docker-hub-cred') {
-                        sh '''
-                            echo "========== Pushing to Docker Hub =========="
-                            echo "📦 Repository: peacechouaib/ynov-project"
-                            echo ""
-                            
-                            docker push peacechouaib/ynov-project:latest
-                            docker push peacechouaib/ynov-project:${BUILD_NUMBER}
-                            
-                            echo ""
-                            echo "✅ Successfully pushed to Docker Hub!"
-                            echo "   https://hub.docker.com/r/peacechouaib/ynov-project"
-                        '''
+                        // إضافة علامات (tags) للصورة
+                        sh "docker tag ${IMAGE_NAME}:latest ${peacechouaib}/${DOCKER_HUB_IMAGE}:latest"
+                        sh "docker tag ${IMAGE_NAME}:latest ${peacechouaib}/${DOCKER_HUB_IMAGE}:${BUILD_NUMBER}"
+                        
+                        // دفع الصور إلى Docker Hub
+                        sh "docker push ${peacechouaib}/${DOCKER_HUB_IMAGE}:latest"
+                        sh "docker push ${peacechouaib}/${DOCKER_HUB_IMAGE}:${BUILD_NUMBER}"
+                        
+                        echo "✅ Image pushed successfully:"
+                        echo "   - ${peacechouaib}/${DOCKER_HUB_IMAGE}:latest"
+                        echo "   - ${peacechouaib}/${DOCKER_HUB_IMAGE}:${BUILD_NUMBER}"
                     }
                 }
             }
         }
 
-        // ========== 8. Stop Old Container ==========
+        // ========== 6. Stop Old Container ==========
         stage('Stop Old Container') {
             steps {
                 script {
@@ -187,12 +139,12 @@ pipeline {
             }
         }
 
-        // ========== 9. Run New Container ==========
+        // ========== 7. Run New Container ==========
         stage('Run Container') {
             steps {
                 script {
                     sh "docker run -d --name ${CONTAINER_NAME} -p 80:80 ${IMAGE_NAME}:latest"
-                    echo "✅ Application running on http://localhost:80"
+                    echo "✅ Container started successfully on port 80"
                 }
             }
         }
@@ -200,12 +152,21 @@ pipeline {
     
     post {
         success {
-            echo "🎉 Pipeline completed successfully!"
-            echo "   📦 Docker Hub: peacechouaib/ynov-project"
-            echo "   🌐 App: http://localhost:80"
+            echo "========================================="
+            echo "✅ PIPELINE COMPLETED SUCCESSFULLY!"
+            echo "========================================="
+            echo "📊 SonarQube: PASSED"
+            echo "🔒 Security Scan: COMPLETED"
+            echo "🐳 Docker Hub: ${peacechouaib}/${DOCKER_HUB_IMAGE}:${BUILD_NUMBER}"
+            echo "🌐 Application: http://localhost:80"
+            echo "========================================="
         }
         failure {
-            echo "❌ Pipeline failed - check logs"
+            echo "========================================="
+            echo "❌ PIPELINE FAILED!"
+            echo "========================================="
+            echo "Check the logs above for details"
+            echo "========================================="
         }
     }
 }
