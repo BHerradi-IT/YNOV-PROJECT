@@ -2,11 +2,15 @@ pipeline {
     agent any
 
     environment {
-        IMAGE_NAME = "ynov-project-image"
+        IMAGE_NAME = "ynov-project"
         CONTAINER_NAME = "ynov-project-container"
         SONAR_HOST_URL = "http://192.168.142.143:9000"
         SONAR_TOKEN = credentials('sonar-token')
         EMAIL_RECIPIENT = "herraditech@gmail.com"
+        
+        // ========== Docker Hub Variables ==========
+        DOCKER_HUB_USERNAME = "peacechouaib"
+        DOCKER_IMAGE_FULL = "${DOCKER_HUB_USERNAME}/${IMAGE_NAME}"
     }
 
     stages {
@@ -69,135 +73,111 @@ pipeline {
             steps {
                 script {
                     sh "docker build -t ${IMAGE_NAME}:latest ."
+                    sh "docker tag ${IMAGE_NAME}:latest ${DOCKER_IMAGE_FULL}:latest"
+                    sh "docker tag ${IMAGE_NAME}:latest ${DOCKER_IMAGE_FULL}:${BUILD_NUMBER}"
+                    echo "✅ Docker image built and tagged successfully"
+                    echo "   Local: ${IMAGE_NAME}:latest"
+                    echo "   Remote: ${DOCKER_IMAGE_FULL}:latest"
+                    echo "   Remote: ${DOCKER_IMAGE_FULL}:${BUILD_NUMBER}"
                 }
             }
         }
 
-        // ========== 5. Trivy Security Scan + PDF Report ==========
-        stage('Trivy Security Scan & PDF Report') {
+        // ========== 5. Trivy Security Scan ==========
+        stage('Trivy Security Scan') {
             steps {
                 script {
                     sh '''
                         echo "========== Trivy Security Scan Started =========="
                         
-                        # إنشاء مجلد للتقارير
                         mkdir -p reports
                         
-                        # استخدام الصورة الصحيحة من Docker Hub
-                        echo "Pulling Trivy image..."
-                        docker pull aquasec/trivy:latest || docker pull aquasec/trivy:0.45.0
-                        
-                        # 1. فحص الثغرات وإنشاء تقرير JSON (باستخدام الاسم الصحيح)
                         docker run --rm \
                           -v /var/run/docker.sock:/var/run/docker.sock \
                           -v $(pwd):/src \
                           -w /src \
-                          aquasec/trivy:0.45.0 \
+                          aquasec/trivy:latest \
                           image ${IMAGE_NAME}:latest \
                           --format json \
                           --output reports/trivy-report.json \
-                          --ignore-unfixed || echo "Trivy scan completed with warnings"
+                          --ignore-unfixed || echo "Scan completed"
                         
-                        # 2. إنشاء تقرير HTML مفصل
                         docker run --rm \
                           -v /var/run/docker.sock:/var/run/docker.sock \
                           -v $(pwd):/src \
                           -w /src \
-                          aquasec/trivy:0.45.0 \
+                          aquasec/trivy:latest \
                           image ${IMAGE_NAME}:latest \
                           --format table \
                           --output reports/trivy-summary.txt \
-                          --ignore-unfixed || echo "Summary report generated"
+                          --ignore-unfixed || echo "Summary created"
                         
-                        # 3. عرض ملخص الثغرات
-                        echo ""
-                        echo "========== Trivy Scan Summary =========="
-                        
-                        # التحقق من وجود الملف قبل البحث فيه
                         if [ -f reports/trivy-report.json ]; then
-                            HIGH_COUNT=$(grep -o '"SEVERITY":"HIGH"' reports/trivy-report.json | wc -l || echo "0")
-                            CRITICAL_COUNT=$(grep -o '"SEVERITY":"CRITICAL"' reports/trivy-report.json | wc -l || echo "0")
-                            MEDIUM_COUNT=$(grep -o '"SEVERITY":"MEDIUM"' reports/trivy-report.json | wc -l || echo "0")
-                            LOW_COUNT=$(grep -o '"SEVERITY":"LOW"' reports/trivy-report.json | wc -l || echo "0")
-                        else
-                            HIGH_COUNT=0
-                            CRITICAL_COUNT=0
-                            MEDIUM_COUNT=0
-                            LOW_COUNT=0
-                            echo "⚠️ No report file found, assuming zero vulnerabilities"
+                            HIGH=$(grep -o '"SEVERITY":"HIGH"' reports/trivy-report.json | wc -l)
+                            CRITICAL=$(grep -o '"SEVERITY":"CRITICAL"' reports/trivy-report.json | wc -l)
+                            echo "🔴 CRITICAL: $CRITICAL"
+                            echo "🟠 HIGH: $HIGH"
                         fi
                         
-                        echo "🔴 CRITICAL: $CRITICAL_COUNT"
-                        echo "🟠 HIGH: $HIGH_COUNT"
-                        echo "🟡 MEDIUM: $MEDIUM_COUNT"
-                        echo "🟢 LOW: $LOW_COUNT"
-                        echo "========================================"
-                        
-                        # إنشاء تقرير HTML بسيط للإرسال
-                        cat > reports/security-report.html << EOF
-                        <html>
-                        <head><title>Trivy Security Report</title></head>
-                        <body>
-                        <h1>🔒 Trivy Security Scan Report</h1>
-                        <p><strong>Build:</strong> ${BUILD_NUMBER}</p>
-                        <p><strong>Date:</strong> $(date)</p>
-                        <p><strong>Image:</strong> ${IMAGE_NAME}:latest</p>
-                        <h2>Vulnerabilities Summary</h2>
-                        <ul>
-                        <li>🔴 CRITICAL: $CRITICAL_COUNT</li>
-                        <li>🟠 HIGH: $HIGH_COUNT</li>
-                        <li>🟡 MEDIUM: $MEDIUM_COUNT</li>
-                        <li>🟢 LOW: $LOW_COUNT</li>
-                        </ul>
-                        <pre>$(cat reports/trivy-summary.txt 2>/dev/null || echo "No detailed summary available")</pre>
-                        </body>
-                        </html>
-                        EOF
-                        
-                        echo "✅ Reports generated successfully"
+                        echo "✅ Security scan completed"
                     '''
                 }
             }
             post {
                 always {
-                    // حفظ التقارير كـ artifacts
-                    archiveArtifacts artifacts: 'reports/*', fingerprint: true, allowEmptyArchive: true
+                    archiveArtifacts artifacts: 'reports/*', allowEmptyArchive: true
                 }
             }
         }
 
-
-        stage('Send Results to Graylog') {
-    steps {
-        script {
-            sh '''
-                echo "========== Sending Trivy Results to Graylog =========="
-                
-                # قراءة تقرير Trivy
-                TRIVY_JSON=$(cat reports/trivy-report.json)
-                
-                # إرسال إلى Graylog عبر GELF HTTP
-                curl -X POST \
-                  -H "Content-Type: application/json" \
-                  -d "{
-                    \"version\": \"1.1\",
-                    \"host\": \"jenkins-server\",
-                    \"short_message\": \"Trivy Security Scan - Build #${BUILD_NUMBER}\",
-                    \"full_message\": \"$(echo $TRIVY_JSON | jq -c .)\",
-                    \"level\": 6,
-                    \"_job_name\": \"${JOB_NAME}\",
-                    \"_build_number\": \"${BUILD_NUMBER}\",
-                    \"_vulnerabilities_high\": $(grep -o '"SEVERITY":"HIGH"' reports/trivy-report.json | wc -l),
-                    \"_vulnerabilities_critical\": $(grep -o '"SEVERITY":"CRITICAL"' reports/trivy-report.json | wc -l)
-                  }" \
-                  http://192.168.10.40:12202/gelf
-                  
-                echo "✅ Results sent to Graylog successfully"
-            '''
+        // ========== 6. Send to Graylog ==========
+        stage('Send to Graylog') {
+            steps {
+                script {
+                    sh '''
+                        if [ -f reports/trivy-report.json ]; then
+                            HIGH=$(grep -o '"SEVERITY":"HIGH"' reports/trivy-report.json | wc -l)
+                            CRITICAL=$(grep -o '"SEVERITY":"CRITICAL"' reports/trivy-report.json | wc -l)
+                            
+                            curl -X POST -H "Content-Type: application/json" \
+                              -d "{
+                                \"version\": \"1.1\",
+                                \"host\": \"jenkins\",
+                                \"short_message\": \"Trivy Scan #${BUILD_NUMBER}\",
+                                \"_image\": \"peacechouaib/ynov-project\",
+                                \"_high\": $HIGH,
+                                \"_critical\": $CRITICAL
+                              }" \
+                              http://192.168.10.40:12202/gelf || echo "Graylog unavailable"
+                        fi
+                    '''
+                }
+            }
         }
-    }
-}
-        // ========== 7. Stop Old Container ==========
+
+        // ========== 7. Push to Docker Hub ==========
+        stage('Push to Docker Hub') {
+            steps {
+                script {
+                    withDockerRegistry(credentialsId: 'docker-hub-cred') {
+                        sh '''
+                            echo "========== Pushing to Docker Hub =========="
+                            echo "📦 Repository: peacechouaib/ynov-project"
+                            echo ""
+                            
+                            docker push peacechouaib/ynov-project:latest
+                            docker push peacechouaib/ynov-project:${BUILD_NUMBER}
+                            
+                            echo ""
+                            echo "✅ Successfully pushed to Docker Hub!"
+                            echo "   https://hub.docker.com/r/peacechouaib/ynov-project"
+                        '''
+                    }
+                }
+            }
+        }
+
+        // ========== 8. Stop Old Container ==========
         stage('Stop Old Container') {
             steps {
                 script {
@@ -207,36 +187,25 @@ pipeline {
             }
         }
 
-        // ========== 8. Run New Container ==========
+        // ========== 9. Run New Container ==========
         stage('Run Container') {
             steps {
                 script {
                     sh "docker run -d --name ${CONTAINER_NAME} -p 80:80 ${IMAGE_NAME}:latest"
-                    echo "✅ Application started successfully on port 80 (Testing mode)"
+                    echo "✅ Application running on http://localhost:80"
                 }
             }
         }
     }
     
-    // ========== Post Pipeline Actions ==========
     post {
-        always {
-            script {
-                echo "========================================="
-                echo "PIPELINE EXECUTION COMPLETED"
-                echo "Application is running on port 80 (Testing mode)"
-                echo "Security report sent to ${EMAIL_RECIPIENT}"
-                echo "========================================="
-            }
-        }
-        
         success {
-            echo "✅ All stages completed successfully!"
+            echo "🎉 Pipeline completed successfully!"
+            echo "   📦 Docker Hub: peacechouaib/ynov-project"
+            echo "   🌐 App: http://localhost:80"
         }
-        
         failure {
-            echo "⚠️ Some stages had issues, but application is still running for testing"
-            echo "Check the logs above for details"
+            echo "❌ Pipeline failed - check logs"
         }
     }
 }
