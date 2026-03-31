@@ -9,7 +9,7 @@ pipeline {
         TRIVY_REPORT = "trivy-report.json"
         
         // ========== Docker Hub Settings ==========
-        DOCKER_HUB_USERNAME = "herraditech"  // غيّر إلى اسم المستخدم الخاص بك
+        DOCKER_HUB_USERNAME = "peacechouaib"  // ✅ استخدم اسم المستخدم الصحيح هنا
         DOCKER_HUB_IMAGE = "ynov-project"
     }
 
@@ -105,25 +105,27 @@ pipeline {
             }
         }
 
-        // ========== 5. Push to Docker Hub (NEW STAGE) ==========
+        // ========== 5. Push to Docker Hub ==========
         stage('Push to Docker Hub') {
             steps {
                 script {
                     echo "========== Pushing Image to Docker Hub =========="
+                    echo "Username: ${DOCKER_HUB_USERNAME}"
+                    echo "Image: ${DOCKER_HUB_IMAGE}"
                     
                     // تسجيل الدخول إلى Docker Hub باستخدام credentials
                     withDockerRegistry(credentialsId: 'docker-hub-cred') {
-                        // إضافة علامات (tags) للصورة
-                        sh "docker tag ${IMAGE_NAME}:latest ${peacechouaib}/${DOCKER_HUB_IMAGE}:latest"
-                        sh "docker tag ${IMAGE_NAME}:latest ${peacechouaib}/${DOCKER_HUB_IMAGE}:${BUILD_NUMBER}"
+                        // ✅ استخدم المتغير DOCKER_HUB_USERNAME بدلاً من الكتابة المباشرة
+                        sh "docker tag ${IMAGE_NAME}:latest ${DOCKER_HUB_USERNAME}/${DOCKER_HUB_IMAGE}:latest"
+                        sh "docker tag ${IMAGE_NAME}:latest ${DOCKER_HUB_USERNAME}/${DOCKER_HUB_IMAGE}:${BUILD_NUMBER}"
                         
                         // دفع الصور إلى Docker Hub
-                        sh "docker push ${peacechouaib}/${DOCKER_HUB_IMAGE}:latest"
-                        sh "docker push ${peacechouaib}/${DOCKER_HUB_IMAGE}:${BUILD_NUMBER}"
+                        sh "docker push ${DOCKER_HUB_USERNAME}/${DOCKER_HUB_IMAGE}:latest"
+                        sh "docker push ${DOCKER_HUB_USERNAME}/${DOCKER_HUB_IMAGE}:${BUILD_NUMBER}"
                         
                         echo "✅ Image pushed successfully:"
-                        echo "   - ${peacechouaib}/${DOCKER_HUB_IMAGE}:latest"
-                        echo "   - ${peacechouaib}/${DOCKER_HUB_IMAGE}:${BUILD_NUMBER}"
+                        echo "   - ${DOCKER_HUB_USERNAME}/${DOCKER_HUB_IMAGE}:latest"
+                        echo "   - ${DOCKER_HUB_USERNAME}/${DOCKER_HUB_IMAGE}:${BUILD_NUMBER}"
                     }
                 }
             }
@@ -157,7 +159,7 @@ pipeline {
             echo "========================================="
             echo "📊 SonarQube: PASSED"
             echo "🔒 Security Scan: COMPLETED"
-            echo "🐳 Docker Hub: ${peacechouaib}/${DOCKER_HUB_IMAGE}:${BUILD_NUMBER}"
+            echo "🐳 Docker Hub: ${DOCKER_HUB_USERNAME}/${DOCKER_HUB_IMAGE}:${BUILD_NUMBER}"
             echo "🌐 Application: http://localhost:80"
             echo "========================================="
         }
