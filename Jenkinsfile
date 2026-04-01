@@ -14,8 +14,8 @@ pipeline {
         // Email Settings
         EMAIL_RECIPIENT = "herraditech@gmail.com"
         
-        // Prometheus Settings
-        PROMETHEUS_PUSHGATEWAY = "http://localhost:9091"
+        // Prometheus Settings - استخدم IP الخادم الحقيقي
+        PROMETHEUS_PUSHGATEWAY = "http://192.168.142.143:9091"
     }
 
     stages {
@@ -124,7 +124,7 @@ pipeline {
             }
         }
 
-        // ========== NEW: Send Metrics to Prometheus ==========
+        // ========== Send Metrics to Prometheus ==========
         stage('Send Metrics to Prometheus') {
             steps {
                 script {
@@ -191,7 +191,6 @@ pipeline {
     post {
         success {
             script {
-                // إرسال بريد مع تقرير Trivy
                 emailext(
                     subject: "✅ Pipeline SUCCESS - ${JOB_NAME} #${BUILD_NUMBER}",
                     body: """
@@ -208,13 +207,10 @@ pipeline {
                         
                         📁 Attached: Trivy security scan reports
                         
-                        📊 Grafana Dashboard: http://localhost:3000
-                        📈 Prometheus: http://localhost:9090
+                        📊 Grafana: http://192.168.142.143:3000
+                        📈 Prometheus: http://192.168.142.143:9090
                         
                         Build URL: ${BUILD_URL}
-                        
-                        ---
-                        Jenkins Pipeline
                     """,
                     to: "${EMAIL_RECIPIENT}",
                     attachmentsPattern: "reports/trivy-scan.txt, reports/trivy-report.json"
@@ -223,9 +219,6 @@ pipeline {
             }
             echo "========================================="
             echo "✅ PIPELINE COMPLETED SUCCESSFULLY!"
-            echo "========================================="
-            echo "📊 Grafana: http://localhost:3000 (admin/admin)"
-            echo "📈 Prometheus: http://localhost:9090"
             echo "========================================="
         }
         failure {
@@ -238,8 +231,7 @@ pipeline {
                         Build: ${JOB_NAME} #${BUILD_NUMBER}
                         Status: FAILED
                         
-                        Check Jenkins logs for details:
-                        ${BUILD_URL}
+                        Check Jenkins logs: ${BUILD_URL}
                     """,
                     to: "${EMAIL_RECIPIENT}",
                     attachmentsPattern: "reports/trivy-scan.txt, reports/trivy-report.json"
