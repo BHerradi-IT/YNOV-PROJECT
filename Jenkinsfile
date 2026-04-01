@@ -77,7 +77,6 @@ pipeline {
             }
         }
 
-        // ========== Trivy Security Scan (مصحح) ==========
         stage('Trivy Security Scan') {
             steps {
                 script {
@@ -86,7 +85,7 @@ pipeline {
                         
                         mkdir -p reports
                         
-                        # سحب صورة Trivy (استخدم الاسم الصحيح)
+                        # سحب صورة Trivy
                         docker pull aquasec/trivy:0.59.0
                         
                         # فحص الصورة وإنشاء تقرير نصي
@@ -164,47 +163,65 @@ pipeline {
         }
     }
     
+    // ========== Post Actions مع إرفاق تقرير Trivy ==========
     post {
         success {
             script {
                 emailext(
                     subject: "✅ Pipeline SUCCESS - ${JOB_NAME} #${BUILD_NUMBER}",
                     body: """
-                        Pipeline completed successfully!
+                        ✅ Pipeline completed successfully!
                         
                         Build: ${JOB_NAME} #${BUILD_NUMBER}
                         Status: SUCCESS
                         
-                        SonarQube: PASSED
-                        Trivy Scan: COMPLETED
-                        Docker Hub: ${DOCKER_HUB_USERNAME}/${DOCKER_HUB_IMAGE}:${BUILD_NUMBER}
-                        Application: http://localhost:80
+                        📊 SonarQube: PASSED
+                        🔒 Trivy Scan: COMPLETED
+                        🐳 Docker Hub: ${DOCKER_HUB_USERNAME}/${DOCKER_HUB_IMAGE}:${BUILD_NUMBER}
+                        🌐 Application: http://localhost:80
+                        
+                        📁 Attached: Trivy security scan reports
                         
                         Build URL: ${BUILD_URL}
+                        
+                        ---
+                        Jenkins Pipeline
                     """,
-                    to: "${EMAIL_RECIPIENT}"
+                    to: "${EMAIL_RECIPIENT}",
+                    attachmentsPattern: "reports/trivy-scan.txt, reports/trivy-report.json"
                 )
-                echo "✅ Success email sent to ${EMAIL_RECIPIENT}"
+                echo "✅ Success email with Trivy report sent to ${EMAIL_RECIPIENT}"
             }
+            echo "========================================="
             echo "✅ PIPELINE COMPLETED SUCCESSFULLY!"
+            echo "========================================="
         }
         failure {
             script {
                 emailext(
                     subject: "❌ Pipeline FAILED - ${JOB_NAME} #${BUILD_NUMBER}",
                     body: """
-                        Pipeline failed!
+                        ❌ Pipeline failed!
                         
                         Build: ${JOB_NAME} #${BUILD_NUMBER}
                         Status: FAILED
                         
-                        Check Jenkins logs: ${BUILD_URL}
+                        📁 Attached: Trivy security scan report (if available)
+                        
+                        Check Jenkins logs for details:
+                        ${BUILD_URL}
+                        
+                        ---
+                        Jenkins Pipeline
                     """,
-                    to: "${EMAIL_RECIPIENT}"
+                    to: "${EMAIL_RECIPIENT}",
+                    attachmentsPattern: "reports/trivy-scan.txt, reports/trivy-report.json"
                 )
-                echo "❌ Failure email sent to ${EMAIL_RECIPIENT}"
+                echo "❌ Failure email with Trivy report sent to ${EMAIL_RECIPIENT}"
             }
+            echo "========================================="
             echo "❌ PIPELINE FAILED!"
+            echo "========================================="
         }
     }
 }
