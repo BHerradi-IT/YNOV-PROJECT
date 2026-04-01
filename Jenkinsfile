@@ -13,6 +13,9 @@ pipeline {
         
         // Email Settings
         EMAIL_RECIPIENT = "herraditech@gmail.com"
+        
+        // Prometheus Settings
+        PROMETHEUS_PUSHGATEWAY = "http://localhost:9091"
     }
 
     stages {
@@ -85,10 +88,8 @@ pipeline {
                         
                         mkdir -p reports
                         
-                        # سحب صورة Trivy
                         docker pull aquasec/trivy:0.59.0
                         
-                        # فحص الصورة وإنشاء تقرير نصي
                         docker run --rm \
                           -v /var/run/docker.sock:/var/run/docker.sock \
                           -v $(pwd):/src \
@@ -99,7 +100,6 @@ pipeline {
                           --format table \
                           --output reports/trivy-scan.txt || true
                         
-                        # إنشاء تقرير JSON
                         docker run --rm \
                           -v /var/run/docker.sock:/var/run/docker.sock \
                           -v $(pwd):/src \
@@ -109,20 +109,45 @@ pipeline {
                           --format json \
                           --output reports/trivy-report.json || true
                         
-                        # عرض التقرير
                         echo "========================================="
                         echo "📊 Trivy Scan Summary"
                         echo "========================================="
                         cat reports/trivy-scan.txt || echo "No vulnerabilities found"
                         echo "========================================="
-                        
-                        echo "✅ Trivy scan completed"
                     '''
                 }
             }
             post {
                 always {
                     archiveArtifacts artifacts: 'reports/*', fingerprint: true, allowEmptyArchive: true
+                }
+            }
+        }
+
+        // ========== NEW: Send Metrics to Prometheus ==========
+        stage('Send Metrics to Prometheus') {
+            steps {
+                script {
+                    sh '''
+                        echo "========== Sending Metrics to Prometheus =========="
+                        
+                        HIGH_COUNT=$(grep -o '"SEVERITY":"HIGH"' reports/trivy-report.json | wc -l || echo "0")
+                        CRITICAL_COUNT=$(grep -o '"SEVERITY":"CRITICAL"' reports/trivy-report.json | wc -l || echo "0")
+                        
+                        echo "🔴 HIGH: $HIGH_COUNT"
+                        echo "🔴 CRITICAL: $CRITICAL_COUNT"
+                        
+                        # إرسال المقاييس إلى Pushgateway
+                        cat <<EOF | curl --data-binary @- ${PROMETHEUS_PUSHGATEWAY}/metrics/job/jenkins_builds/instance/${JOB_NAME}
+                        # TYPE jenkins_build_info gauge
+                        jenkins_build_info{build_number="${BUILD_NUMBER}",job="${JOB_NAME}",status="success"} 1
+                        # TYPE trivy_vulnerabilities gauge
+                        trivy_vulnerabilities{severity="HIGH"} ${HIGH_COUNT}
+                        trivy_vulnerabilities{severity="CRITICAL"} ${CRITICAL_COUNT}
+                        EOF
+                        
+                        echo "✅ Metrics sent to Prometheus Pushgateway"
+                    '''
                 }
             }
         }
@@ -163,10 +188,10 @@ pipeline {
         }
     }
     
-    // ========== Post Actions مع إرفاق تقرير Trivy ==========
     post {
         success {
             script {
+                // إرسال بريد مع تقرير Trivy
                 emailext(
                     subject: "✅ Pipeline SUCCESS - ${JOB_NAME} #${BUILD_NUMBER}",
                     body: """
@@ -177,10 +202,14 @@ pipeline {
                         
                         📊 SonarQube: PASSED
                         🔒 Trivy Scan: COMPLETED
+                        📈 Prometheus Metrics: SENT
                         🐳 Docker Hub: ${DOCKER_HUB_USERNAME}/${DOCKER_HUB_IMAGE}:${BUILD_NUMBER}
                         🌐 Application: http://localhost:80
                         
                         📁 Attached: Trivy security scan reports
+                        
+                        📊 Grafana Dashboard: http://localhost:3000
+                        📈 Prometheus: http://localhost:9090
                         
                         Build URL: ${BUILD_URL}
                         
@@ -190,10 +219,13 @@ pipeline {
                     to: "${EMAIL_RECIPIENT}",
                     attachmentsPattern: "reports/trivy-scan.txt, reports/trivy-report.json"
                 )
-                echo "✅ Success email with Trivy report sent to ${EMAIL_RECIPIENT}"
+                echo "✅ Success email sent to ${EMAIL_RECIPIENT}"
             }
             echo "========================================="
             echo "✅ PIPELINE COMPLETED SUCCESSFULLY!"
+            echo "========================================="
+            echo "📊 Grafana: http://localhost:3000 (admin/admin)"
+            echo "📈 Prometheus: http://localhost:9090"
             echo "========================================="
         }
         failure {
@@ -206,18 +238,13 @@ pipeline {
                         Build: ${JOB_NAME} #${BUILD_NUMBER}
                         Status: FAILED
                         
-                        📁 Attached: Trivy security scan report (if available)
-                        
                         Check Jenkins logs for details:
                         ${BUILD_URL}
-                        
-                        ---
-                        Jenkins Pipeline
                     """,
                     to: "${EMAIL_RECIPIENT}",
                     attachmentsPattern: "reports/trivy-scan.txt, reports/trivy-report.json"
                 )
-                echo "❌ Failure email with Trivy report sent to ${EMAIL_RECIPIENT}"
+                echo "❌ Failure email sent to ${EMAIL_RECIPIENT}"
             }
             echo "========================================="
             echo "❌ PIPELINE FAILED!"
