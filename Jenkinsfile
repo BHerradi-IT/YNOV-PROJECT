@@ -2,20 +2,25 @@ pipeline {
     agent any
 
     environment {
+        // ========== Application Settings ==========
         IMAGE_NAME = "ynov-project-image"
         CONTAINER_NAME = "ynov-project-container"
+        
+        // ========== SonarQube ==========
         SONAR_HOST_URL = "http://192.168.142.143:9000"
         SONAR_TOKEN = credentials('sonar-token')
         
-        // Docker Hub Settings
+        // ========== Docker Hub ==========
         DOCKER_HUB_USERNAME = "peacechouaib"
         DOCKER_HUB_IMAGE = "ynov-project"
         
-        // Email Settings
+        // ========== Email ==========
         EMAIL_RECIPIENT = "herraditech@gmail.com"
         
-        // Prometheus Settings - استخدم IP الخادم الحقيقي
+        // ========== Prometheus ==========
         PROMETHEUS_PUSHGATEWAY = "http://192.168.142.143:9091"
+        PROMETHEUS_URL = "http://192.168.142.143:9090"
+        GRAFANA_URL = "http://192.168.142.143:3000"
     }
 
     stages {
@@ -124,12 +129,12 @@ pipeline {
             }
         }
 
-        // ========== Send Metrics to Prometheus ==========
         stage('Send Metrics to Prometheus') {
             steps {
                 script {
                     sh '''
                         echo "========== Sending Metrics to Prometheus =========="
+                        echo "Pushgateway: ${PROMETHEUS_PUSHGATEWAY}"
                         
                         HIGH_COUNT=$(grep -o '"SEVERITY":"HIGH"' reports/trivy-report.json | wc -l || echo "0")
                         CRITICAL_COUNT=$(grep -o '"SEVERITY":"CRITICAL"' reports/trivy-report.json | wc -l || echo "0")
@@ -137,7 +142,6 @@ pipeline {
                         echo "🔴 HIGH: $HIGH_COUNT"
                         echo "🔴 CRITICAL: $CRITICAL_COUNT"
                         
-                        # إرسال المقاييس إلى Pushgateway
                         cat <<EOF | curl --data-binary @- ${PROMETHEUS_PUSHGATEWAY}/metrics/job/jenkins_builds/instance/${JOB_NAME}
                         # TYPE jenkins_build_info gauge
                         jenkins_build_info{build_number="${BUILD_NUMBER}",job="${JOB_NAME}",status="success"} 1
@@ -146,7 +150,7 @@ pipeline {
                         trivy_vulnerabilities{severity="CRITICAL"} ${CRITICAL_COUNT}
                         EOF
                         
-                        echo "✅ Metrics sent to Prometheus Pushgateway"
+                        echo "✅ Metrics sent to ${PROMETHEUS_PUSHGATEWAY}"
                     '''
                 }
             }
@@ -155,15 +159,11 @@ pipeline {
         stage('Push to Docker Hub') {
             steps {
                 script {
-                    echo "========== Pushing to Docker Hub =========="
-                    
                     withDockerRegistry(credentialsId: 'docker-hub-cred') {
                         sh "docker tag ${IMAGE_NAME}:latest ${DOCKER_HUB_USERNAME}/${DOCKER_HUB_IMAGE}:latest"
                         sh "docker tag ${IMAGE_NAME}:latest ${DOCKER_HUB_USERNAME}/${DOCKER_HUB_IMAGE}:${BUILD_NUMBER}"
                         sh "docker push ${DOCKER_HUB_USERNAME}/${DOCKER_HUB_IMAGE}:latest"
                         sh "docker push ${DOCKER_HUB_USERNAME}/${DOCKER_HUB_IMAGE}:${BUILD_NUMBER}"
-                        
-                        echo "✅ Image pushed: ${DOCKER_HUB_USERNAME}/${DOCKER_HUB_IMAGE}:${BUILD_NUMBER}"
                     }
                 }
             }
@@ -197,50 +197,30 @@ pipeline {
                         ✅ Pipeline completed successfully!
                         
                         Build: ${JOB_NAME} #${BUILD_NUMBER}
-                        Status: SUCCESS
                         
-                        📊 SonarQube: PASSED
-                        🔒 Trivy Scan: COMPLETED
-                        📈 Prometheus Metrics: SENT
+                        📊 SonarQube: ${SONAR_HOST_URL}
+                        📈 Prometheus: ${PROMETHEUS_URL}
+                        📊 Grafana: ${GRAFANA_URL}
                         🐳 Docker Hub: ${DOCKER_HUB_USERNAME}/${DOCKER_HUB_IMAGE}:${BUILD_NUMBER}
-                        🌐 Application: http://localhost:80
-                        
-                        📁 Attached: Trivy security scan reports
-                        
-                        📊 Grafana: http://192.168.142.143:3000
-                        📈 Prometheus: http://192.168.142.143:9090
                         
                         Build URL: ${BUILD_URL}
                     """,
                     to: "${EMAIL_RECIPIENT}",
                     attachmentsPattern: "reports/trivy-scan.txt, reports/trivy-report.json"
                 )
-                echo "✅ Success email sent to ${EMAIL_RECIPIENT}"
             }
-            echo "========================================="
             echo "✅ PIPELINE COMPLETED SUCCESSFULLY!"
-            echo "========================================="
         }
         failure {
             script {
                 emailext(
                     subject: "❌ Pipeline FAILED - ${JOB_NAME} #${BUILD_NUMBER}",
-                    body: """
-                        ❌ Pipeline failed!
-                        
-                        Build: ${JOB_NAME} #${BUILD_NUMBER}
-                        Status: FAILED
-                        
-                        Check Jenkins logs: ${BUILD_URL}
-                    """,
+                    body: "Pipeline failed! Check Jenkins logs: ${BUILD_URL}",
                     to: "${EMAIL_RECIPIENT}",
                     attachmentsPattern: "reports/trivy-scan.txt, reports/trivy-report.json"
                 )
-                echo "❌ Failure email sent to ${EMAIL_RECIPIENT}"
             }
-            echo "========================================="
             echo "❌ PIPELINE FAILED!"
-            echo "========================================="
         }
     }
 }
