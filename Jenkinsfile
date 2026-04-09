@@ -6,7 +6,7 @@ pipeline {
         IMAGE_NAME = "ynov-project-image"
         CONTAINER_NAME = "ynov-project-container"
         
-        // ========== SonarQube (على الخادم البعيد) ==========
+        // ========== SonarQube (Remote Server) ==========
         SONAR_HOST_URL = "http://192.168.142.143:9000"
         SONAR_TOKEN = credentials('sonar-token')
         
@@ -17,10 +17,14 @@ pipeline {
         // ========== Email ==========
         EMAIL_RECIPIENT = "herraditech@gmail.com"
         
-        // ========== Prometheus + Grafana (على الخادم البعيد) ==========
+        // ========== Prometheus + Grafana (Remote Server) ==========
         PROMETHEUS_PUSHGATEWAY = "http://192.168.142.143:9091"
         PROMETHEUS_URL = "http://192.168.142.143:9090"
         GRAFANA_URL = "http://192.168.142.143:3000"
+        
+        // ========== DefectDojo (Remote Server) ==========
+        DEFECTDOJO_URL = "http://192.168.142.143:9090"
+        DEFECTDOJO_API_KEY = credentials('defectdojo-api-key')
     }
 
     stages {
@@ -140,7 +144,71 @@ pipeline {
             }
         }
 
-        // ========== 6. Send Metrics to Prometheus ==========
+        // ========== 6. DefectDojo Import ==========
+        stage('DefectDojo Import') {
+            steps {
+                script {
+                    sh '''
+                        echo "========================================="
+                        echo "🛡️ Importing Security Reports to DefectDojo"
+                        echo "========================================="
+                        echo "📍 DefectDojo URL: ${DEFECTDOJO_URL}"
+                        
+                        # Import Trivy report to DefectDojo
+                        curl -X POST \
+                          -H "Authorization: Token ${DEFECTDOJO_API_KEY}" \
+                          -F "scan_type=Trivy Scan" \
+                          -F "file=@reports/trivy-report.json" \
+                          -F "engagement_id=1" \
+                          -F "product_id=1" \
+                          ${DEFECTDOJO_URL}/api/v2/import-scan/ || true
+                        
+                        echo ""
+                        echo "✅ Reports sent to DefectDojo"
+                        echo "🔗 DefectDojo: ${DEFECTDOJO_URL}"
+                    '''
+                }
+            }
+        }
+
+        // ========== 7. DefectDojo Quality Gate ==========
+        stage('DefectDojo Quality Gate') {
+            steps {
+                script {
+                    sh '''
+                        echo "========================================="
+                        echo "🔍 DefectDojo Quality Gate Check"
+                        echo "========================================="
+                        
+                        # Get critical findings count
+                        CRITICAL_COUNT=$(curl -s -H "Authorization: Token ${DEFECTDOJO_API_KEY}" \
+                          "${DEFECTDOJO_URL}/api/v2/findings?severity=Critical&limit=1" | \
+                          grep -o '"count":[0-9]*' | head -1 | cut -d':' -f2 || echo "0")
+                        
+                        # Get high findings count
+                        HIGH_COUNT=$(curl -s -H "Authorization: Token ${DEFECTDOJO_API_KEY}" \
+                          "${DEFECTDOJO_URL}/api/v2/findings?severity=High&limit=1" | \
+                          grep -o '"count":[0-9]*' | head -1 | cut -d':' -f2 || echo "0")
+                        
+                        echo "🔴 Critical vulnerabilities: ${CRITICAL_COUNT}"
+                        echo "🟠 High vulnerabilities: ${HIGH_COUNT}"
+                        
+                        if [ "${CRITICAL_COUNT}" -gt 0 ]; then
+                            echo "❌ Critical vulnerabilities found! Pipeline failed."
+                            exit 1
+                        else
+                            echo "✅ No critical vulnerabilities found."
+                        fi
+                        
+                        if [ "${HIGH_COUNT}" -gt 5 ]; then
+                            echo "⚠️ Warning: ${HIGH_COUNT} high vulnerabilities found!"
+                        fi
+                    '''
+                }
+            }
+        }
+
+        // ========== 8. Send Metrics to Prometheus ==========
         stage('Send Metrics to Prometheus') {
             steps {
                 script {
@@ -156,7 +224,7 @@ pipeline {
                         echo "🔴 HIGH Vulnerabilities: $HIGH_COUNT"
                         echo "🔴 CRITICAL Vulnerabilities: $CRITICAL_COUNT"
                         
-                        # إرسال المقاييس إلى Pushgateway
+                        # Send metrics to Pushgateway
                         curl -X POST \
                           -H "Content-Type: text/plain" \
                           --data-binary "# TYPE jenkins_build_info gauge
@@ -173,7 +241,7 @@ pipeline {
             }
         }
 
-        // ========== 7. Push to Docker Hub ==========
+        // ========== 9. Push to Docker Hub ==========
         stage('Push to Docker Hub') {
             steps {
                 script {
@@ -193,7 +261,7 @@ pipeline {
             }
         }
 
-        // ========== 8. Stop Old Container ==========
+        // ========== 10. Stop Old Container ==========
         stage('Stop Old Container') {
             steps {
                 script {
@@ -204,13 +272,13 @@ pipeline {
             }
         }
 
-        // ========== 9. Run New Container ==========
+        // ========== 11. Run New Container ==========
         stage('Run Container') {
             steps {
                 script {
                     sh "docker run -d --name ${CONTAINER_NAME} -p 80:80 ${IMAGE_NAME}:latest"
                     echo "========================================="
-                    echo "✅ Application is running on port 80"
+                    echo "✅ Application running on port 80"
                     echo "========================================="
                 }
             }
@@ -229,16 +297,18 @@ pipeline {
                         Build: ${JOB_NAME} #${BUILD_NUMBER}
                         Status: SUCCESS
                         
-                        SonarQube: ${SONAR_HOST_URL}
-                        Prometheus: ${PROMETHEUS_URL}
-                        Grafana: ${GRAFANA_URL}
-                        Docker Hub: ${DOCKER_HUB_USERNAME}/${DOCKER_HUB_IMAGE}:${BUILD_NUMBER}
-                        Application: http://localhost:80
+                        📊 SonarQube: ${SONAR_HOST_URL}
+                        🛡️ DefectDojo: ${DEFECTDOJO_URL}
+                        📈 Prometheus: ${PROMETHEUS_URL}
+                        📊 Grafana: ${GRAFANA_URL}
+                        🐳 Docker Hub: ${DOCKER_HUB_USERNAME}/${DOCKER_HUB_IMAGE}:${BUILD_NUMBER}
+                        🌐 Application: http://localhost:80
                         
-                        Build URL: ${BUILD_URL}
+                        🔗 Build URL: ${BUILD_URL}
                         
                         ---
-                        Jenkins Pipeline
+                        Jenkins CI/CD Pipeline
+                        YNOV Project - Security & Quality Pipeline
                     """,
                     to: "${EMAIL_RECIPIENT}",
                     attachmentsPattern: "reports/trivy-scan.txt, reports/trivy-report.json"
@@ -248,6 +318,7 @@ pipeline {
                 echo "✅ PIPELINE COMPLETED SUCCESSFULLY!"
                 echo "========================================="
                 echo "📊 SonarQube: ${SONAR_HOST_URL}"
+                echo "🛡️ DefectDojo: ${DEFECTDOJO_URL}"
                 echo "📈 Prometheus: ${PROMETHEUS_URL}"
                 echo "📊 Grafana: ${GRAFANA_URL}"
                 echo "🐳 Docker Hub: ${DOCKER_HUB_USERNAME}/${DOCKER_HUB_IMAGE}:${BUILD_NUMBER}"
@@ -265,11 +336,11 @@ pipeline {
                         Build: ${JOB_NAME} #${BUILD_NUMBER}
                         Status: FAILED
                         
-                        Check Jenkins logs for details:
-                        ${BUILD_URL}
+                        🔗 Check Jenkins logs: ${BUILD_URL}
                         
                         ---
-                        Jenkins Pipeline
+                        Jenkins CI/CD Pipeline
+                        YNOV Project - Security & Quality Pipeline
                     """,
                     to: "${EMAIL_RECIPIENT}",
                     attachmentsPattern: "reports/trivy-scan.txt, reports/trivy-report.json"
