@@ -290,38 +290,38 @@ pipeline {
         success {
             script {
                 emailext(
-                    subject: "✅ Pipeline SUCCESS - ${JOB_NAME} #${BUILD_NUMBER}",
+                    subject: "✅ Pipeline SUCCESS - ${env.JOB_NAME} #${env.BUILD_NUMBER}",
                     body: """
                         ✅ Pipeline completed successfully!
                         
-                        Build: ${JOB_NAME} #${BUILD_NUMBER}
+                        Build: ${env.JOB_NAME} #${env.BUILD_NUMBER}
                         Status: SUCCESS
                         
-                        📊 SonarQube: ${SONAR_HOST_URL}
-                        🛡️ DefectDojo: ${DEFECTDOJO_URL}
-                        📈 Prometheus: ${PROMETHEUS_URL}
-                        📊 Grafana: ${GRAFANA_URL}
-                        🐳 Docker Hub: ${DOCKER_HUB_USERNAME}/${DOCKER_HUB_IMAGE}:${BUILD_NUMBER}
+                        📊 SonarQube: ${env.SONAR_HOST_URL}
+                        🛡️ DefectDojo: ${env.DEFECTDOJO_URL}
+                        📈 Prometheus: ${env.PROMETHEUS_URL}
+                        📊 Grafana: ${env.GRAFANA_URL}
+                        🐳 Docker Hub: ${env.DOCKER_HUB_USERNAME}/${env.DOCKER_HUB_IMAGE}:${env.BUILD_NUMBER}
                         🌐 Application: http://localhost:80
                         
-                        🔗 Build URL: ${BUILD_URL}
+                        🔗 Build URL: ${env.BUILD_URL}
                         
                         ---
                         Jenkins CI/CD Pipeline
                         YNOV Project - Security & Quality Pipeline
                     """,
-                    to: "${EMAIL_RECIPIENT}",
+                    to: "${env.EMAIL_RECIPIENT}",
                     attachmentsPattern: "reports/trivy-scan.txt, reports/trivy-report.json"
                 )
                 echo ""
                 echo "========================================="
                 echo "✅ PIPELINE COMPLETED SUCCESSFULLY!"
                 echo "========================================="
-                echo "📊 SonarQube: ${SONAR_HOST_URL}"
-                echo "🛡️ DefectDojo: ${DEFECTDOJO_URL}"
-                echo "📈 Prometheus: ${PROMETHEUS_URL}"
-                echo "📊 Grafana: ${GRAFANA_URL}"
-                echo "🐳 Docker Hub: ${DOCKER_HUB_USERNAME}/${DOCKER_HUB_IMAGE}:${BUILD_NUMBER}"
+                echo "📊 SonarQube: ${env.SONAR_HOST_URL}"
+                echo "🛡️ DefectDojo: ${env.DEFECTDOJO_URL}"
+                echo "📈 Prometheus: ${env.PROMETHEUS_URL}"
+                echo "📊 Grafana: ${env.GRAFANA_URL}"
+                echo "🐳 Docker Hub: ${env.DOCKER_HUB_USERNAME}/${env.DOCKER_HUB_IMAGE}:${env.BUILD_NUMBER}"
                 echo "🌐 Application: http://localhost:80"
                 echo "========================================="
             }
@@ -329,27 +329,27 @@ pipeline {
         failure {
             script {
                 emailext(
-                    subject: "❌ Pipeline FAILED - ${JOB_NAME} #${BUILD_NUMBER}",
+                    subject: "❌ Pipeline FAILED - ${env.JOB_NAME} #${env.BUILD_NUMBER}",
                     body: """
                         ❌ Pipeline failed!
                         
-                        Build: ${JOB_NAME} #${BUILD_NUMBER}
+                        Build: ${env.JOB_NAME} #${env.BUILD_NUMBER}
                         Status: FAILED
                         
-                        🔗 Check Jenkins logs: ${BUILD_URL}
+                        🔗 Check Jenkins logs: ${env.BUILD_URL}
                         
                         ---
                         Jenkins CI/CD Pipeline
                         YNOV Project - Security & Quality Pipeline
                     """,
-                    to: "${EMAIL_RECIPIENT}",
+                    to: "${env.EMAIL_RECIPIENT}",
                     attachmentsPattern: "reports/trivy-scan.txt, reports/trivy-report.json"
                 )
                 echo ""
                 echo "========================================="
                 echo "❌ PIPELINE FAILED!"
                 echo "========================================="
-                echo "Check Jenkins logs: ${BUILD_URL}"
+                echo "Check Jenkins logs: ${env.BUILD_URL}"
                 echo "========================================="
             }
         }
