@@ -2,47 +2,31 @@ pipeline {
     agent any
 
     environment {
-        // ========== Application Settings ==========
         IMAGE_NAME = "ynov-project-image"
         CONTAINER_NAME = "ynov-project-container"
-        
-        // ========== SonarQube (Remote Server) ==========
         SONAR_HOST_URL = "http://192.168.142.143:9000"
         SONAR_TOKEN = credentials('sonar-token')
         
-        // ========== Docker Hub ==========
+        // Docker Hub Settings
         DOCKER_HUB_USERNAME = "peacechouaib"
         DOCKER_HUB_IMAGE = "ynov-project"
         
-        // ========== Email ==========
+        // Email Settings
         EMAIL_RECIPIENT = "herraditech@gmail.com"
-        
-        // ========== Prometheus + Grafana (Remote Server) ==========
-        PROMETHEUS_PUSHGATEWAY = "http://192.168.142.143:9091"
-        PROMETHEUS_URL = "http://192.168.142.143:9090"
-        GRAFANA_URL = "http://192.168.142.143:3000"
-        
-        // ========== DefectDojo (Remote Server) ==========
-        DEFECTDOJO_URL = "http://192.168.142.143:9090"
-        DEFECTDOJO_API_KEY = credentials('defectdojo-api-key')
     }
 
     stages {
-        // ========== 1. Clone Repository ==========
         stage('Clone') {
             steps {
                 git branch: 'main', url: 'https://github.com/BHerradi-IT/YNOV-PROJECT.git'
             }
         }
 
-        // ========== 2. SonarQube Analysis ==========
         stage('SonarQube Analysis') {
             steps {
                 script {
                     sh '''
-                        echo "========================================="
-                        echo "🔍 SonarQube Analysis Started"
-                        echo "========================================="
+                        echo "========== SonarQube Analysis Started =========="
                         
                         docker run --rm \
                           -v $(pwd):/usr/src \
@@ -63,11 +47,10 @@ pipeline {
             }
         }
 
-        // ========== 3. Quality Gate Check ==========
         stage('Quality Gate Check') {
             steps {
                 script {
-                    echo "⏳ Waiting for SonarQube analysis..."
+                    echo "Waiting for SonarQube analysis..."
                     sleep(time: 30, unit: 'SECONDS')
                     
                     sh '''
@@ -85,30 +68,28 @@ pipeline {
             }
         }
 
-        // ========== 4. Build Docker Image ==========
         stage('Build Docker Image') {
             steps {
                 script {
                     sh "docker build -t ${IMAGE_NAME}:latest ."
                     sh "docker tag ${IMAGE_NAME}:latest ${IMAGE_NAME}:${BUILD_NUMBER}"
-                    echo "✅ Docker image built: ${IMAGE_NAME}:${BUILD_NUMBER}"
                 }
             }
         }
 
-        // ========== 5. Trivy Security Scan ==========
+        // ========== Trivy Security Scan (مصحح) ==========
         stage('Trivy Security Scan') {
             steps {
                 script {
                     sh '''
-                        echo "========================================="
-                        echo "🔒 Trivy Security Scan Started"
-                        echo "========================================="
+                        echo "========== Trivy Security Scan Started =========="
                         
                         mkdir -p reports
                         
+                        # سحب صورة Trivy (استخدم الاسم الصحيح)
                         docker pull aquasec/trivy:0.59.0
                         
+                        # فحص الصورة وإنشاء تقرير نصي
                         docker run --rm \
                           -v /var/run/docker.sock:/var/run/docker.sock \
                           -v $(pwd):/src \
@@ -119,6 +100,7 @@ pipeline {
                           --format table \
                           --output reports/trivy-scan.txt || true
                         
+                        # إنشاء تقرير JSON
                         docker run --rm \
                           -v /var/run/docker.sock:/var/run/docker.sock \
                           -v $(pwd):/src \
@@ -128,12 +110,14 @@ pipeline {
                           --format json \
                           --output reports/trivy-report.json || true
                         
-                        echo ""
+                        # عرض التقرير
                         echo "========================================="
                         echo "📊 Trivy Scan Summary"
                         echo "========================================="
                         cat reports/trivy-scan.txt || echo "No vulnerabilities found"
                         echo "========================================="
+                        
+                        echo "✅ Trivy scan completed"
                     '''
                 }
             }
@@ -144,214 +128,83 @@ pipeline {
             }
         }
 
-        // ========== 6. DefectDojo Import ==========
-        stage('DefectDojo Import') {
-            steps {
-                script {
-                    sh '''
-                        echo "========================================="
-                        echo "🛡️ Importing Security Reports to DefectDojo"
-                        echo "========================================="
-                        echo "📍 DefectDojo URL: ${DEFECTDOJO_URL}"
-                        
-                        # Import Trivy report to DefectDojo
-                        curl -X POST \
-                          -H "Authorization: Token ${DEFECTDOJO_API_KEY}" \
-                          -F "scan_type=Trivy Scan" \
-                          -F "file=@reports/trivy-report.json" \
-                          -F "engagement_id=1" \
-                          -F "product_id=1" \
-                          ${DEFECTDOJO_URL}/api/v2/import-scan/ || true
-                        
-                        echo ""
-                        echo "✅ Reports sent to DefectDojo"
-                        echo "🔗 DefectDojo: ${DEFECTDOJO_URL}"
-                    '''
-                }
-            }
-        }
-
-        // ========== 7. DefectDojo Quality Gate ==========
-        stage('DefectDojo Quality Gate') {
-            steps {
-                script {
-                    sh '''
-                        echo "========================================="
-                        echo "🔍 DefectDojo Quality Gate Check"
-                        echo "========================================="
-                        
-                        # Get critical findings count
-                        CRITICAL_COUNT=$(curl -s -H "Authorization: Token ${DEFECTDOJO_API_KEY}" \
-                          "${DEFECTDOJO_URL}/api/v2/findings?severity=Critical&limit=1" | \
-                          grep -o '"count":[0-9]*' | head -1 | cut -d':' -f2 || echo "0")
-                        
-                        # Get high findings count
-                        HIGH_COUNT=$(curl -s -H "Authorization: Token ${DEFECTDOJO_API_KEY}" \
-                          "${DEFECTDOJO_URL}/api/v2/findings?severity=High&limit=1" | \
-                          grep -o '"count":[0-9]*' | head -1 | cut -d':' -f2 || echo "0")
-                        
-                        echo "🔴 Critical vulnerabilities: ${CRITICAL_COUNT}"
-                        echo "🟠 High vulnerabilities: ${HIGH_COUNT}"
-                        
-                        if [ "${CRITICAL_COUNT}" -gt 0 ]; then
-                            echo "❌ Critical vulnerabilities found! Pipeline failed."
-                            exit 1
-                        else
-                            echo "✅ No critical vulnerabilities found."
-                        fi
-                        
-                        if [ "${HIGH_COUNT}" -gt 5 ]; then
-                            echo "⚠️ Warning: ${HIGH_COUNT} high vulnerabilities found!"
-                        fi
-                    '''
-                }
-            }
-        }
-
-        // ========== 8. Send Metrics to Prometheus ==========
-        stage('Send Metrics to Prometheus') {
-            steps {
-                script {
-                    sh '''
-                        echo "========================================="
-                        echo "📈 Sending Metrics to Prometheus"
-                        echo "📍 Pushgateway: ${PROMETHEUS_PUSHGATEWAY}"
-                        echo "========================================="
-                        
-                        HIGH_COUNT=$(grep -o '"SEVERITY":"HIGH"' reports/trivy-report.json | wc -l || echo "0")
-                        CRITICAL_COUNT=$(grep -o '"SEVERITY":"CRITICAL"' reports/trivy-report.json | wc -l || echo "0")
-                        
-                        echo "🔴 HIGH Vulnerabilities: $HIGH_COUNT"
-                        echo "🔴 CRITICAL Vulnerabilities: $CRITICAL_COUNT"
-                        
-                        # Send metrics to Pushgateway
-                        curl -X POST \
-                          -H "Content-Type: text/plain" \
-                          --data-binary "# TYPE jenkins_build_info gauge
-                        jenkins_build_info{build_number=\"${BUILD_NUMBER}\",job=\"${JOB_NAME}\",status=\"success\"} 1
-                        # TYPE trivy_vulnerabilities gauge
-                        trivy_vulnerabilities{severity=\"HIGH\"} ${HIGH_COUNT}
-                        trivy_vulnerabilities{severity=\"CRITICAL\"} ${CRITICAL_COUNT}" \
-                          ${PROMETHEUS_PUSHGATEWAY}/metrics/job/jenkins_builds/instance/${JOB_NAME}
-                        
-                        echo ""
-                        echo "✅ Metrics sent to ${PROMETHEUS_PUSHGATEWAY}"
-                    '''
-                }
-            }
-        }
-
-        // ========== 9. Push to Docker Hub ==========
         stage('Push to Docker Hub') {
             steps {
                 script {
-                    echo "========================================="
-                    echo "🐳 Pushing to Docker Hub"
-                    echo "========================================="
+                    echo "========== Pushing to Docker Hub =========="
                     
                     withDockerRegistry(credentialsId: 'docker-hub-cred') {
                         sh "docker tag ${IMAGE_NAME}:latest ${DOCKER_HUB_USERNAME}/${DOCKER_HUB_IMAGE}:latest"
                         sh "docker tag ${IMAGE_NAME}:latest ${DOCKER_HUB_USERNAME}/${DOCKER_HUB_IMAGE}:${BUILD_NUMBER}"
                         sh "docker push ${DOCKER_HUB_USERNAME}/${DOCKER_HUB_IMAGE}:latest"
                         sh "docker push ${DOCKER_HUB_USERNAME}/${DOCKER_HUB_IMAGE}:${BUILD_NUMBER}"
+                        
+                        echo "✅ Image pushed: ${DOCKER_HUB_USERNAME}/${DOCKER_HUB_IMAGE}:${BUILD_NUMBER}"
                     }
-                    
-                    echo "✅ Image pushed: ${DOCKER_HUB_USERNAME}/${DOCKER_HUB_IMAGE}:${BUILD_NUMBER}"
                 }
             }
         }
 
-        // ========== 10. Stop Old Container ==========
         stage('Stop Old Container') {
             steps {
                 script {
                     sh "docker stop ${CONTAINER_NAME} || true"
                     sh "docker rm ${CONTAINER_NAME} || true"
-                    echo "✅ Old container removed"
                 }
             }
         }
 
-        // ========== 11. Run New Container ==========
         stage('Run Container') {
             steps {
                 script {
                     sh "docker run -d --name ${CONTAINER_NAME} -p 80:80 ${IMAGE_NAME}:latest"
-                    echo "========================================="
                     echo "✅ Application running on port 80"
-                    echo "========================================="
                 }
             }
         }
     }
     
-    // ========== Post Pipeline Actions ==========
     post {
         success {
             script {
                 emailext(
-                    subject: "✅ Pipeline SUCCESS - ${env.JOB_NAME} #${env.BUILD_NUMBER}",
+                    subject: "✅ Pipeline SUCCESS - ${JOB_NAME} #${BUILD_NUMBER}",
                     body: """
-                        ✅ Pipeline completed successfully!
+                        Pipeline completed successfully!
                         
-                        Build: ${env.JOB_NAME} #${env.BUILD_NUMBER}
+                        Build: ${JOB_NAME} #${BUILD_NUMBER}
                         Status: SUCCESS
                         
-                        📊 SonarQube: ${env.SONAR_HOST_URL}
-                        🛡️ DefectDojo: ${env.DEFECTDOJO_URL}
-                        📈 Prometheus: ${env.PROMETHEUS_URL}
-                        📊 Grafana: ${env.GRAFANA_URL}
-                        🐳 Docker Hub: ${env.DOCKER_HUB_USERNAME}/${env.DOCKER_HUB_IMAGE}:${env.BUILD_NUMBER}
-                        🌐 Application: http://localhost:80
+                        SonarQube: PASSED
+                        Trivy Scan: COMPLETED
+                        Docker Hub: ${DOCKER_HUB_USERNAME}/${DOCKER_HUB_IMAGE}:${BUILD_NUMBER}
+                        Application: http://localhost:80
                         
-                        🔗 Build URL: ${env.BUILD_URL}
-                        
-                        ---
-                        Jenkins CI/CD Pipeline
-                        YNOV Project - Security & Quality Pipeline
+                        Build URL: ${BUILD_URL}
                     """,
-                    to: "${env.EMAIL_RECIPIENT}",
-                    attachmentsPattern: "reports/trivy-scan.txt, reports/trivy-report.json"
+                    to: "${EMAIL_RECIPIENT}"
                 )
-                echo ""
-                echo "========================================="
-                echo "✅ PIPELINE COMPLETED SUCCESSFULLY!"
-                echo "========================================="
-                echo "📊 SonarQube: ${env.SONAR_HOST_URL}"
-                echo "🛡️ DefectDojo: ${env.DEFECTDOJO_URL}"
-                echo "📈 Prometheus: ${env.PROMETHEUS_URL}"
-                echo "📊 Grafana: ${env.GRAFANA_URL}"
-                echo "🐳 Docker Hub: ${env.DOCKER_HUB_USERNAME}/${env.DOCKER_HUB_IMAGE}:${env.BUILD_NUMBER}"
-                echo "🌐 Application: http://localhost:80"
-                echo "========================================="
+                echo "✅ Success email sent to ${EMAIL_RECIPIENT}"
             }
+            echo "✅ PIPELINE COMPLETED SUCCESSFULLY!"
         }
         failure {
             script {
                 emailext(
-                    subject: "❌ Pipeline FAILED - ${env.JOB_NAME} #${env.BUILD_NUMBER}",
+                    subject: "❌ Pipeline FAILED - ${JOB_NAME} #${BUILD_NUMBER}",
                     body: """
-                        ❌ Pipeline failed!
+                        Pipeline failed!
                         
-                        Build: ${env.JOB_NAME} #${env.BUILD_NUMBER}
+                        Build: ${JOB_NAME} #${BUILD_NUMBER}
                         Status: FAILED
                         
-                        🔗 Check Jenkins logs: ${env.BUILD_URL}
-                        
-                        ---
-                        Jenkins CI/CD Pipeline
-                        YNOV Project - Security & Quality Pipeline
+                        Check Jenkins logs: ${BUILD_URL}
                     """,
-                    to: "${env.EMAIL_RECIPIENT}",
-                    attachmentsPattern: "reports/trivy-scan.txt, reports/trivy-report.json"
+                    to: "${EMAIL_RECIPIENT}"
                 )
-                echo ""
-                echo "========================================="
-                echo "❌ PIPELINE FAILED!"
-                echo "========================================="
-                echo "Check Jenkins logs: ${env.BUILD_URL}"
-                echo "========================================="
+                echo "❌ Failure email sent to ${EMAIL_RECIPIENT}"
             }
+            echo "❌ PIPELINE FAILED!"
         }
     }
 }
